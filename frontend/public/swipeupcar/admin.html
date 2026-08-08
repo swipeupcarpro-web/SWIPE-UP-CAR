@@ -62,10 +62,10 @@ if(u){
  const head=t=>`<h1 style="font-size:26px">${t}</h1>`;
  const chip=s=>{const c={'Validé':'var(--green)','approved':'var(--green)','En vérification':'var(--amber)','En attente':'var(--amber)','pending':'var(--amber)','Refusé':'var(--red)','rejected':'var(--red)','draft':'#556'}[s]||'#556';return `<span class="chip" style="color:${c};border:none;background:#fff">${s}</span>`};
  const tbl=(h,rows)=>`<div class="table-wrap card" style="padding:8px;margin-top:14px"><table><thead><tr>${h.map(x=>`<th>${x}</th>`).join('')}</tr></thead><tbody>${rows.length?rows.map(r=>`<tr>${r.map(c=>`<td>${c}</td>`).join('')}</tr>`).join(''):`<tr><td colspan="${h.length}" style="text-align:center;color:var(--muted)">Aucune donnée</td></tr>`}</tbody></table></div>`;
- window.valid=id=>{const r=apiSync('/admin/owners/'+id+'/validate','POST');if(r.__err){toast(r.__err);return}loadState();toast('Loueur validé — email envoyé');document.querySelector('[data-t=owners]').click()};
- window.refuseO=id=>{const r=apiSync('/admin/owners/'+id+'/refuse','POST');if(r.__err){toast(r.__err);return}loadState();toast('Loueur refusé');document.querySelector('[data-t=owners]').click()};
- window.approveV=id=>{const r=apiSync('/admin/vehicles/'+id+'/approve','POST');if(r.__err){toast(r.__err);return}loadState();toast('Véhicule approuvé — email envoyé');document.querySelector('[data-t=vehicles]').click()};
- window.rejectV=id=>{const reason=prompt('Raison du refus :','Photos non conformes');if(!reason)return;const r=apiSync('/admin/vehicles/'+id+'/reject','POST',{reason});if(r.__err){toast(r.__err);return}loadState();toast('Véhicule refusé');document.querySelector('[data-t=vehicles]').click()};
+ window.valid=id=>{const r=apiSync('/admin/owners/'+id+'/validate','POST');if(r.error){toast(r.error);return}loadState();toast('Loueur validé — email envoyé');document.querySelector('[data-t=owners]').click()};
+ window.refuseO=id=>{const r=apiSync('/admin/owners/'+id+'/refuse','POST');if(r.error){toast(r.error);return}loadState();toast('Loueur refusé');document.querySelector('[data-t=owners]').click()};
+ window.approveV=id=>{const r=apiSync('/admin/vehicles/'+id+'/approve','POST');if(r.error){toast(r.error);return}loadState();toast('Véhicule approuvé — email envoyé');document.querySelector('[data-t=vehicles]').click()};
+ window.rejectV=id=>{const reason=prompt('Raison du refus :','Photos non conformes');if(!reason)return;const r=apiSync('/admin/vehicles/'+id+'/reject','POST',{reason});if(r.error){toast(r.error);return}loadState();toast('Véhicule refusé');document.querySelector('[data-t=vehicles]').click()};
  window.suspend=id=>{toast('Suspension : action enregistrée')};
  window.saveComm=()=>{STATE.settings.commission=(+document.getElementById('commRate').value)/100;toast('Taux mis à jour (appliqué aux futures réservations)')};
  render('dash');

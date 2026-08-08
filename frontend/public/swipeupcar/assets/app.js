@@ -96,7 +96,7 @@ function renderNav(){
   const el=document.getElementById('nav'); if(!el) return;
   el.innerHTML=`<div style="position:sticky;top:0;z-index:100;background:rgba(244,237,226,.85);backdrop-filter:blur(12px);border-bottom:1px solid var(--line)">
     <div class="container" style="display:flex;align-items:center;gap:22px;height:66px">
-      <a href="index.html" style="display:flex;align-items:center;gap:8px;font-family:'Fraunces',serif;font-weight:700;font-size:22px"><span style="background:var(--red);color:#fff;width:30px;height:30px;border-radius:8px;display:grid;place-items:center;font-size:16px"><i class="fa-solid fa-bolt"></i></span>SWIPEUP<span style="color:var(--red)">CAR</span></a>
+      <a href="index.html" style="display:flex;align-items:center;gap:10px"><img src="assets/logo.png" alt="SWIPEUPCAR" style="height:46px;width:46px;border-radius:50%"><span style="font-family:'Fraunces',serif;font-weight:700;font-size:20px" class="hide-mobile">SWIPEUP<span style="color:var(--red)">CAR</span></span></a>
       <nav class="hide-mobile" style="display:flex;gap:20px;margin-left:10px">
         <a class="nav-link" href="location.html">Louer une voiture</a>
         <a class="nav-link" href="services.html?s=entretien">Entretien</a>
@@ -111,7 +111,7 @@ function renderFooter(){
   const el=document.getElementById('footer'); if(!el) return;
   el.innerHTML=`<footer style="background:var(--carbon);color:#EDE6DA;margin-top:60px">
    <div class="container" style="padding:50px 20px;display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:30px">
-    <div style="max-width:260px"><div style="font-family:'Fraunces',serif;font-size:22px;font-weight:700">SWIPEUP<span style="color:#ff6b6b">CAR</span></div><p style="color:#b8ae9f;font-size:14px;margin-top:10px">La plateforme automobile nouvelle génération. Trouvez, réservez et profitez partout en France.</p></div>
+    <div style="max-width:260px"><img src="assets/logo.png" alt="SWIPEUPCAR" style="height:72px;width:72px;border-radius:50%"><p style="color:#b8ae9f;font-size:14px;margin-top:10px">La plateforme automobile nouvelle génération. Trouvez, réservez et profitez partout en France.</p></div>
     <div><h4 class="fh">Plateforme</h4><a href="location.html" class="foot">Louer une voiture</a><a href="services.html?s=entretien" class="foot">Entretien</a><a href="services.html?s=pneus" class="foot">Pneus</a><a href="services.html?s=pieces" class="foot">Pièces auto</a><a href="services.html?s=lavage" class="foot">Lavage</a></div>
     <div><h4 class="fh">Informations</h4><a href="infos.html#how" class="foot">Comment ça marche</a><a href="infos.html#security" class="foot">Sécurité</a><a href="infos.html#faq" class="foot">FAQ</a><a href="infos.html#cgu" class="foot">Conditions</a><a href="infos.html#privacy" class="foot">Confidentialité</a></div>
     <div><h4 class="fh">Professionnels</h4><a href="devenir-loueur.html" class="foot">Devenir loueur</a><a href="loueur.html" class="foot">Espace professionnel</a></div>
