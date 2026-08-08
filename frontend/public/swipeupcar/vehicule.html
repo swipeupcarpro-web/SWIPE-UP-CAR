@@ -8,7 +8,9 @@
 <script src="assets/app.js"></script>
 <script>
 const id=new URLSearchParams(location.search).get('id');
-const db=DB.get();const v=db.vehicles.find(x=>x.id===id);const owner=db.users.find(u=>u.id===(v&&v.owner));
+let v=apiSync('/vehicles/'+id);if(v.__err)v=null;const db=DB.get();
+if(v){const li=STATE.vehicles.find(x=>x.id===id);if(li)li.booked=v.booked;}
+const owner=v?{firstName:v.ownerFirst||v.ownerName,company:v.ownerName,verified:v.ownerVerified,rating:v.ownerRating,rentals:v.ownerRentals,since:v.ownerSince,satisfaction:v.ownerSatisfaction}:null;
 if(!v){document.getElementById('page').innerHTML='<div class="card" style="padding:50px;text-align:center"><h2>Véhicule introuvable</h2><a href="location.html" class="btn btn-red" style="margin-top:12px">Retour aux résultats</a></div>';}
 else{
 const spec=(i,l,val)=>`<div style="display:flex;gap:10px;align-items:center;padding:8px 0"><i class="fa-solid ${i}" style="color:var(--red);width:20px"></i><span style="color:var(--muted);font-size:14px;width:110px">${l}</span><b>${val}</b></div>`;

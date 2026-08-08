@@ -2,7 +2,9 @@
 <title>Location de voiture en France — Résultats | SWIPEUPCAR</title>
 <meta name="description" content="Comparez et réservez des véhicules de location partout en France. Filtres par prix, catégorie, boîte, carburant et plus.">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"><link rel="stylesheet" href="assets/style.css"></head>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"><script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<link rel="stylesheet" href="assets/style.css"></head>
 <body><div id="nav"></div>
 
 <div style="background:#fff;border-bottom:1px solid var(--line)"><div class="container" style="padding:14px 20px">
@@ -36,6 +38,8 @@
         <option value="rel">Pertinence</option><option value="asc">Prix croissant</option><option value="desc">Prix décroissant</option><option value="rate">Meilleures notes</option><option value="new">Plus récents</option>
       </select>
     </div>
+    <div style="display:flex;justify-content:flex-end;margin-top:10px"><button class="btn btn-ghost" id="mapToggle" style="padding:7px 14px;font-size:14px" data-testid="map-toggle"><i class="fa-solid fa-map-location-dot"></i> Afficher la carte</button></div>
+    <div id="map" style="display:none;height:360px;border-radius:16px;margin-top:12px;border:1px solid var(--line);overflow:hidden;z-index:1"></div>
     <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:18px;margin-top:18px" id="results"></div>
     <div id="empty" style="display:none;text-align:center;padding:60px 20px" class="card"><i class="fa-solid fa-car-on" style="font-size:40px;color:var(--muted)"></i><h3 style="margin:16px 0 6px">Aucun véhicule ne correspond</h3><p style="color:var(--muted)">Essayez d'élargir vos filtres ou votre localisation.</p></div>
   </main>
@@ -68,7 +72,19 @@ function render(){
   document.getElementById('resCount').textContent=list.length+' véhicule(s)'+(where?` pour "${P.get('where')}"`:'');
   document.getElementById('results').innerHTML=list.map(vehicleCard).join('');
   document.getElementById('empty').style.display=list.length?'none':'block';
+  window.__list=list;drawMap(list);
 }
+let _map,_markers=[];
+function drawMap(list){
+  const el=document.getElementById('map');if(!el||el.style.display==='none')return;
+  if(!_map){_map=L.map('map').setView([46.6,2.3],5);L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap',maxZoom:18}).addTo(_map);}
+  _markers.forEach(m=>_map.removeLayer(m));_markers=[];
+  const pts=[];
+  list.forEach(v=>{if(v.lat==null)return;const m=L.marker([v.lat,v.lng]).addTo(_map);m.bindPopup(`<b>${v.brand} ${v.model}</b><br>${v.city} • ${v.price} €/j<br><a href="vehicule.html?id=${v.id}">Voir le véhicule</a>`);_markers.push(m);pts.push([v.lat,v.lng]);});
+  if(pts.length)_map.fitBounds(pts,{padding:[40,40],maxZoom:11});
+  setTimeout(()=>_map.invalidateSize(),100);
+}
+document.getElementById('mapToggle').onclick=function(){const el=document.getElementById('map');const show=el.style.display==='none';el.style.display=show?'block':'none';this.innerHTML=show?'<i class="fa-solid fa-list"></i> Masquer la carte':'<i class="fa-solid fa-map-location-dot"></i> Afficher la carte';if(show)drawMap(window.__list||[])};
 document.querySelectorAll('#filters input,#sort').forEach(el=>el.addEventListener('change',render));
 render();
 </script>
