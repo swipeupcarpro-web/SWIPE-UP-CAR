@@ -1,0 +1,76 @@
+<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Location de voiture en France — Résultats | SWIPEUPCAR</title>
+<meta name="description" content="Comparez et réservez des véhicules de location partout en France. Filtres par prix, catégorie, boîte, carburant et plus.">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"><link rel="stylesheet" href="assets/style.css"></head>
+<body><div id="nav"></div>
+
+<div style="background:#fff;border-bottom:1px solid var(--line)"><div class="container" style="padding:14px 20px">
+  <form id="topSearch" style="display:grid;grid-template-columns:1.4fr 1fr 1fr auto;gap:10px" class="search-grid">
+    <input class="input" name="where" placeholder="Ville / département" data-testid="top-where">
+    <input class="input" type="date" name="from" data-testid="top-from">
+    <input class="input" type="date" name="to" data-testid="top-to">
+    <button class="btn btn-red" data-testid="top-modify"><i class="fa-solid fa-magnifying-glass"></i> Modifier</button>
+  </form>
+</div></div>
+
+<div class="container" style="padding:22px 20px;display:grid;grid-template-columns:270px 1fr;gap:26px" class="loc-grid">
+  <!-- Filters -->
+  <aside class="card" style="padding:18px;height:fit-content;position:sticky;top:80px" id="filters">
+    <div style="font-weight:800;font-size:16px;margin-bottom:14px">Filtres</div>
+    <label class="label">Prix / jour (€)</label>
+    <div style="display:flex;gap:8px"><input class="input" type="number" id="pmin" placeholder="Min"><input class="input" type="number" id="pmax" placeholder="Max"></div>
+    <label class="label" style="margin-top:16px">Catégorie</label><div id="fCat"></div>
+    <label class="label" style="margin-top:16px">Boîte</label><div id="fGear"></div>
+    <label class="label" style="margin-top:16px">Carburant</label><div id="fFuel"></div>
+    <label class="label" style="margin-top:16px">Options</label><div id="fFeat"></div>
+    <label class="label" style="margin-top:16px">Note minimum</label>
+    <select class="input" id="fRating"><option value="0">Toutes</option><option value="4">4+ ⭐</option><option value="4.5">4,5+ ⭐</option><option value="4.8">4,8+ ⭐</option></select>
+    <button class="btn btn-ghost" style="width:100%;margin-top:16px" onclick="resetFilters()" data-testid="reset-filters">Réinitialiser</button>
+  </aside>
+
+  <main>
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
+      <div><h1 style="font-size:24px;margin:0" id="resTitle">Véhicules disponibles</h1><div style="color:var(--muted);font-size:14px" id="resCount"></div></div>
+      <select class="input" id="sort" style="width:auto" data-testid="sort-select">
+        <option value="rel">Pertinence</option><option value="asc">Prix croissant</option><option value="desc">Prix décroissant</option><option value="rate">Meilleures notes</option><option value="new">Plus récents</option>
+      </select>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:18px;margin-top:18px" id="results"></div>
+    <div id="empty" style="display:none;text-align:center;padding:60px 20px" class="card"><i class="fa-solid fa-car-on" style="font-size:40px;color:var(--muted)"></i><h3 style="margin:16px 0 6px">Aucun véhicule ne correspond</h3><p style="color:var(--muted)">Essayez d'élargir vos filtres ou votre localisation.</p></div>
+  </main>
+</div>
+
+<div id="footer"></div><div id="mnav"></div>
+<script src="assets/app.js"></script>
+<script>
+const P=new URLSearchParams(location.search);
+const CATS=['Citadine','Berline','SUV','Premium','Sportive','Utilitaire'],GEARS=['Manuelle','Automatique'],FUELS=['Essence','Diesel','Hybride','Électrique'],FEATS=['GPS','CarPlay','Android Auto','Caméra','Climatisation','Toit panoramique','Siège bébé'];
+const chk=(id,arr,name)=>document.getElementById(id).innerHTML=arr.map(x=>`<label style="display:flex;gap:8px;align-items:center;font-size:14px;padding:3px 0;cursor:pointer"><input type="checkbox" name="${name}" value="${x}" ${P.get('cat')===x?'checked':''}> ${x}</label>`).join('');
+chk('fCat',CATS,'cat');chk('fGear',GEARS,'gear');chk('fFuel',FUELS,'fuel');chk('fFeat',FEATS,'feat');
+document.querySelector('[name=where]').value=P.get('where')||'';
+document.querySelector('#topSearch [name=from]').value=P.get('from')||'';
+document.querySelector('#topSearch [name=to]').value=P.get('to')||'';
+document.getElementById('topSearch').onsubmit=e=>{e.preventDefault();const f=new FormData(e.target);const q=new URLSearchParams();['where','from','to'].forEach(k=>{if(f.get(k))q.set(k,f.get(k))});location.search=q};
+function getChecks(name){return[...document.querySelectorAll(`input[name=${name}]:checked`)].map(i=>i.value)}
+function resetFilters(){document.querySelectorAll('#filters input[type=checkbox]').forEach(c=>c.checked=false);pmin.value='';pmax.value='';fRating.value='0';render()}
+function render(){
+  let list=DB.get().vehicles.filter(v=>v.status==='approved');
+  const where=(P.get('where')||'').toLowerCase().trim();
+  if(where)list=list.filter(v=>(v.city+' '+v.dept+' '+v.brand+' '+v.model+' '+v.cat).toLowerCase().includes(where.split(' ')[0]) || where.split(' ').every(w=>(v.city+' '+v.dept+' '+v.brand+' '+v.model+' '+v.cat).toLowerCase().includes(w)));
+  const min=+pmin.value||0,max=+pmax.value||1e9;list=list.filter(v=>v.price>=min&&v.price<=max);
+  const cats=getChecks('cat');if(cats.length)list=list.filter(v=>cats.includes(v.cat));
+  const gears=getChecks('gear');if(gears.length)list=list.filter(v=>gears.includes(v.gear));
+  const fuels=getChecks('fuel');if(fuels.length)list=list.filter(v=>fuels.includes(v.fuel));
+  const feats=getChecks('feat');if(feats.length)list=list.filter(v=>feats.every(f=>v.features.includes(f)));
+  const rate=+fRating.value;if(rate)list=list.filter(v=>v.rating>=rate);
+  const s=sort.value;if(s==='asc')list.sort((a,b)=>a.price-b.price);else if(s==='desc')list.sort((a,b)=>b.price-a.price);else if(s==='rate')list.sort((a,b)=>b.rating-a.rating);else if(s==='new')list.sort((a,b)=>b.year-a.year);
+  document.getElementById('resCount').textContent=list.length+' véhicule(s)'+(where?` pour "${P.get('where')}"`:'');
+  document.getElementById('results').innerHTML=list.map(vehicleCard).join('');
+  document.getElementById('empty').style.display=list.length?'none':'block';
+}
+document.querySelectorAll('#filters input,#sort').forEach(el=>el.addEventListener('change',render));
+render();
+</script>
+<style>@media(max-width:860px){.loc-grid{grid-template-columns:1fr!important}#filters{position:static!important}.search-grid{grid-template-columns:1fr 1fr!important}}</style>
+</body></html>

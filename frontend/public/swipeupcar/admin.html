@@ -1,0 +1,75 @@
+<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Administration | SWIPEUPCAR</title><meta name="robots" content="noindex">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"><link rel="stylesheet" href="assets/style.css"></head>
+<body><div id="nav"></div>
+<div class="container" style="padding:22px 20px;display:grid;grid-template-columns:230px 1fr;gap:24px" class="dash-grid">
+  <aside class="sidebar card hide-mobile" style="padding:14px;height:fit-content;position:sticky;top:80px">
+    <a data-t="dash" class="active"><i class="fa-solid fa-gauge"></i> Dashboard</a>
+    <a data-t="users"><i class="fa-solid fa-users"></i> Utilisateurs</a>
+    <a data-t="owners"><i class="fa-solid fa-briefcase"></i> Loueurs</a>
+    <a data-t="vehicles"><i class="fa-solid fa-car"></i> Véhicules</a>
+    <a data-t="bookings"><i class="fa-solid fa-calendar-check"></i> Réservations</a>
+    <a data-t="commissions"><i class="fa-solid fa-percent"></i> Commissions</a>
+    <a data-t="settings"><i class="fa-solid fa-gear"></i> Paramètres</a>
+  </aside>
+  <main id="main"></main>
+</div>
+<div id="footer"></div><div id="mnav"></div>
+<script src="assets/app.js"></script>
+<script>
+const u=requireAuth('ADMIN');
+if(u){
+ const tabs=[...document.querySelectorAll('.sidebar a[data-t]')];
+ tabs.forEach(t=>t.onclick=()=>{tabs.forEach(x=>x.classList.remove('active'));t.classList.add('active');render(t.dataset.t)});
+ function render(t){
+  const db=DB.get();const M=document.getElementById('main');
+  if(t==='dash'){
+    const bk=db.bookings;const ca=bk.reduce((s,b)=>s+b.total,0);const comm=bk.reduce((s,b)=>s+b.commission,0);
+    M.innerHTML=`<h1 style="font-size:26px">Dashboard administrateur</h1>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin-top:16px">
+     <div class="stat"><div class="num">${money(ca)}</div><div style="color:var(--muted)">CA plateforme</div></div>
+     <div class="stat"><div class="num" style="color:var(--red)">${money(comm)}</div><div style="color:var(--muted)">Commissions SUC (5%)</div></div>
+     <div class="stat"><div class="num">${bk.length}</div><div style="color:var(--muted)">Réservations</div></div>
+     <div class="stat"><div class="num">${db.users.filter(x=>x.role==='LOUEUR').length}</div><div style="color:var(--muted)">Loueurs</div></div>
+     <div class="stat"><div class="num">${db.vehicles.length}</div><div style="color:var(--muted)">Véhicules</div></div>
+     <div class="stat"><div class="num">${db.users.filter(x=>x.role==='PARTICULIER').length}</div><div style="color:var(--muted)">Particuliers</div></div>
+     <div class="stat"><div class="num" style="color:var(--amber)">${db.vehicles.filter(v=>v.status==='pending').length}</div><div style="color:var(--muted)">Annonces en attente</div></div>
+     <div class="stat"><div class="num" style="color:var(--amber)">${db.users.filter(x=>x.role==='LOUEUR'&&x.proStatus&&x.proStatus!=='Validé').length}</div><div style="color:var(--muted)">Loueurs en attente</div></div>
+    </div>
+    <div class="card" style="padding:20px;margin-top:20px"><b>Croissance des réservations</b><div style="display:flex;align-items:end;gap:8px;height:120px;margin-top:14px">${[3,5,4,7,9,8,12].map(h=>`<div style="flex:1;background:var(--red);border-radius:6px 6px 0 0;height:${h*8}px"></div>`).join('')}</div><div style="display:flex;justify-content:space-between;color:var(--muted);font-size:12px;margin-top:6px"><span>Lun</span><span>Mar</span><span>Mer</span><span>Jeu</span><span>Ven</span><span>Sam</span><span>Dim</span></div></div>`;
+  } else if(t==='users'){
+    const us=db.users.filter(x=>x.role==='PARTICULIER');
+    M.innerHTML=head('Utilisateurs')+tbl(['Nom','Email','Tél','Statut','Actions'],us.map(x=>[`${x.firstName} ${x.lastName||''}`,x.email,x.phone||'—',x.verified?'Vérifié':'Non vérifié',`<button class="btn btn-ghost" style="padding:5px 10px;font-size:13px" onclick="suspend('${x.id}')">Suspendre</button>`]));
+  } else if(t==='owners'){
+    const os=db.users.filter(x=>x.role==='LOUEUR');
+    M.innerHTML=head('Loueurs')+tbl(['Entreprise','Email','SIRET','Statut','Actions'],os.map(x=>[x.company||x.firstName,x.email,x.siret||'—',chip(x.proStatus||'Validé'),`${x.proStatus!=='Validé'?`<button class="btn btn-red" style="padding:5px 10px;font-size:13px" onclick="valid('${x.id}')">Valider</button> `:''}<button class="btn btn-ghost" style="padding:5px 10px;font-size:13px" onclick="refuseO('${x.id}')">Refuser</button>`]));
+  } else if(t==='vehicles'){
+    M.innerHTML=head('Véhicules')+tbl(['Véhicule','Loueur','Prix','Statut','Actions'],db.vehicles.map(v=>{const o=db.users.find(x=>x.id===v.owner);return[`${v.brand} ${v.model}`,o?o.firstName:'—',v.price+' €',chip(v.status),`${v.status!=='approved'?`<button class="btn btn-red" style="padding:5px 10px;font-size:13px" onclick="approveV('${v.id}')">Approuver</button> `:''}<button class="btn btn-ghost" style="padding:5px 10px;font-size:13px" onclick="rejectV('${v.id}')">Refuser</button>`]}));
+  } else if(t==='bookings'){
+    M.innerHTML=head('Réservations')+tbl(['Réf','Véhicule','Client','Montant','Commission','Net loueur'],db.bookings.map(b=>{const v=db.vehicles.find(x=>x.id===b.vehicleId);const c=db.users.find(x=>x.id===b.userId);return[b.ref,v?`${v.brand} ${v.model}`:'—',c?c.firstName:'—',money(b.total),`<span style="color:var(--red)">${money(b.commission)}</span>`,`<span style="color:var(--green)">${money(b.ownerAmount)}</span>`]}));
+  } else if(t==='commissions'){
+    const comm=db.bookings.reduce((s,b)=>s+b.commission,0);
+    M.innerHTML=`<h1 style="font-size:26px">Commission SWIPEUPCAR</h1><div class="stat" style="max-width:280px;margin:14px 0"><div class="num" style="color:var(--red)">${money(comm)}</div><div style="color:var(--muted)">Total commissions perçues (${(db.settings.commission*100)}%)</div></div>`+tbl(['Réf','Montant','Taux','Commission','Net pro','Statut'],db.bookings.map(b=>[b.ref,money(b.total),(db.settings.commission*100)+'%',`<span style="color:var(--red)">${money(b.commission)}</span>`,money(b.ownerAmount),'Perçue']));
+  } else if(t==='settings'){
+    M.innerHTML=`<h1 style="font-size:26px">Paramètres</h1><div class="card" style="padding:22px;margin-top:14px;max-width:420px">
+     <label class="label">Taux de commission (%)</label><input class="input" type="number" id="commRate" value="${db.settings.commission*100}" step="0.5">
+     <p style="color:var(--muted);font-size:13px;margin-top:6px">Taux par défaut : 5 %. Modifiable pour de futures évolutions.</p>
+     <button class="btn btn-red" style="margin-top:12px" onclick="saveComm()">Enregistrer</button>
+    </div><div class="card" style="padding:22px;margin-top:14px;max-width:420px"><b>Rôles disponibles</b><div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px">${['VISITEUR','PARTICULIER','LOUEUR','ADMIN','GARAGE (à venir)','PNEUMATIQUE (à venir)','VENDEUR_PIÈCES (à venir)','LAVAGE (à venir)'].map(r=>`<span class="chip">${r}</span>`).join('')}</div></div>`;
+  }
+ }
+ const head=t=>`<h1 style="font-size:26px">${t}</h1>`;
+ const chip=s=>{const c={'Validé':'var(--green)','approved':'var(--green)','En vérification':'var(--amber)','En attente':'var(--amber)','pending':'var(--amber)','Refusé':'var(--red)','rejected':'var(--red)','draft':'#556'}[s]||'#556';return `<span class="chip" style="color:${c};border:none;background:#fff">${s}</span>`};
+ const tbl=(h,rows)=>`<div class="table-wrap card" style="padding:8px;margin-top:14px"><table><thead><tr>${h.map(x=>`<th>${x}</th>`).join('')}</tr></thead><tbody>${rows.length?rows.map(r=>`<tr>${r.map(c=>`<td>${c}</td>`).join('')}</tr>`).join(''):`<tr><td colspan="${h.length}" style="text-align:center;color:var(--muted)">Aucune donnée</td></tr>`}</tbody></table></div>`;
+ window.valid=id=>{const db=DB.get();const o=db.users.find(x=>x.id===id);o.proStatus='Validé';o.verified=true;DB.set(db);notify(id,'Votre compte loueur a été validé ! Vous pouvez publier vos véhicules.');toast('Loueur validé');document.querySelector('[data-t=owners]').click()};
+ window.refuseO=id=>{const db=DB.get();const o=db.users.find(x=>x.id===id);o.proStatus='Refusé';DB.set(db);notify(id,'Votre candidature loueur a été refusée.');toast('Loueur refusé');document.querySelector('[data-t=owners]').click()};
+ window.approveV=id=>{const db=DB.get();const v=db.vehicles.find(x=>x.id===id);v.status='approved';DB.set(db);notify(v.owner,`Votre véhicule ${v.brand} ${v.model} a été approuvé et est en ligne.`);toast('Véhicule approuvé');document.querySelector('[data-t=vehicles]').click()};
+ window.rejectV=id=>{const r=prompt('Raison du refus :','Photos non conformes');if(!r)return;const db=DB.get();const v=db.vehicles.find(x=>x.id===id);v.status='rejected';DB.set(db);notify(v.owner,`Votre véhicule ${v.brand} ${v.model} a été refusé : ${r}`);toast('Véhicule refusé');document.querySelector('[data-t=vehicles]').click()};
+ window.suspend=id=>{toast('Compte suspendu (démo)')};
+ window.saveComm=()=>{const db=DB.get();db.settings.commission=(+document.getElementById('commRate').value)/100;DB.set(db);toast('Taux de commission mis à jour')};
+ render('dash');
+}
+</script>
+<style>@media(max-width:860px){.dash-grid{grid-template-columns:1fr!important}}</style>
+</body></html>

@@ -1,0 +1,63 @@
+<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Devenir loueur | SWIPEUPCAR</title><meta name="description" content="Publiez vos véhicules sur SWIPEUPCAR. Commission unique de 5%, sans abonnement.">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"><link rel="stylesheet" href="assets/style.css"></head>
+<body><div id="nav"></div>
+<section class="container" style="padding:40px 20px">
+  <div style="text-align:center;max-width:640px;margin:0 auto">
+    <span class="chip"><i class="fa-solid fa-briefcase" style="color:var(--red)"></i> Espace professionnel</span>
+    <h1 style="font-size:clamp(30px,5vw,46px);margin:14px 0">Gagnez de l'argent avec vos véhicules</h1>
+    <p style="color:var(--muted);font-size:18px">Publiez vos véhicules, recevez des réservations et développez votre activité. <b>Commission unique de 5 %</b> — aucun abonnement, aucun frais mensuel.</p>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin:30px 0">
+    ${''}
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:30px;margin-top:20px" class="dl-grid">
+    <div>
+      <h2 style="font-size:24px">Comment ça marche</h2>
+      <ol style="line-height:2;color:#40382f;padding-left:18px">
+        <li>Créez votre compte professionnel</li>
+        <li>Renseignez vos informations (SIRET, assurance, RIB)</li>
+        <li>Notre équipe vérifie votre dossier</li>
+        <li>Ajoutez vos véhicules avec photos et tarifs</li>
+        <li>Recevez des réservations et vos revenus</li>
+      </ol>
+      <div class="card" style="padding:18px;margin-top:14px">
+        <div style="display:flex;justify-content:space-between"><span>Exemple : réservation</span><b>500 €</b></div>
+        <div style="display:flex;justify-content:space-between;color:var(--muted)"><span>Commission SWIPEUPCAR (5%)</span><span>− 25 €</span></div>
+        <div style="display:flex;justify-content:space-between;padding-top:10px;border-top:1px solid var(--line);margin-top:8px;font-size:18px"><b>Vous recevez</b><b style="color:var(--green)">475 €</b></div>
+      </div>
+    </div>
+    <div class="card" style="padding:26px;height:fit-content">
+      <h2 style="font-size:22px;margin-top:0">Inscription professionnelle</h2>
+      <form id="proForm">
+        <div style="display:flex;gap:12px"><div style="flex:1"><label class="label">Prénom</label><input class="input" name="firstName" required></div><div style="flex:1"><label class="label">Nom</label><input class="input" name="lastName" required></div></div>
+        <label class="label" style="margin-top:12px">Nom de l'entreprise</label><input class="input" name="company" required>
+        <label class="label" style="margin-top:12px">SIRET</label><input class="input" name="siret" placeholder="14 chiffres" required>
+        <label class="label" style="margin-top:12px">Email professionnel</label><input class="input" type="email" name="email" required>
+        <label class="label" style="margin-top:12px">Téléphone</label><input class="input" name="phone" required>
+        <label class="label" style="margin-top:12px">Attestation d'assurance</label><input class="input" type="file" data-testid="pro-doc">
+        <label class="label" style="margin-top:12px">IBAN (reversements)</label><input class="input" name="iban" placeholder="FR76 ...">
+        <label class="label" style="margin-top:12px">Mot de passe</label><input class="input" type="password" name="password" minlength="6" required>
+        <div id="err" style="color:var(--red);font-size:14px;margin-top:10px;display:none"></div>
+        <button class="btn btn-red" style="width:100%;margin-top:18px" data-testid="pro-submit">Soumettre ma candidature</button>
+        <p style="color:var(--muted);font-size:12px;text-align:center;margin-top:10px">Votre compte sera en statut « En vérification » jusqu'à validation par notre équipe.</p>
+      </form>
+    </div>
+  </div>
+</section>
+<div id="footer"></div><div id="mnav"></div>
+<script src="assets/app.js"></script>
+<script>
+const perks=[['fa-euro-sign','5% seulement','La commission la plus basse du marché.'],['fa-calendar-check','0 abonnement','Aucun frais fixe, vous payez à la réservation.'],['fa-shield-halved','Paiements sécurisés','Reversements automatiques via Stripe Connect.'],['fa-headset','Support dédié','Une équipe à votre écoute.']];
+document.querySelector('.container div[style*="repeat(auto-fit"]').innerHTML=perks.map(([i,t,d])=>`<div class="card" style="padding:20px"><i class="fa-solid ${i}" style="font-size:22px;color:var(--red)"></i><h3 style="font-size:17px;margin:10px 0 4px">${t}</h3><p style="color:var(--muted);font-size:14px;margin:0">${d}</p></div>`).join('');
+document.getElementById('proForm').onsubmit=e=>{e.preventDefault();const f=Object.fromEntries(new FormData(e.target));f.role='LOUEUR';f.proType='LOUEUR';f.proStatus='En vérification';f.rating=0;f.rentals=0;f.since='2026';f.satisfaction=0;
+ const r=register(f);if(r.err){const el=document.getElementById('err');el.style.display='block';el.textContent=r.err;return}
+ notify(r.user.id,'Candidature reçue. Votre dossier est en cours de vérification.');
+ // notifier admin
+ const db=DB.get();notify('A001','Nouveau loueur à valider : '+f.company);DB.set(db);
+ toast('Candidature envoyée !');setTimeout(()=>location.href='loueur.html',800);
+};
+</script>
+<style>@media(max-width:860px){.dl-grid{grid-template-columns:1fr!important}}</style>
+</body></html>

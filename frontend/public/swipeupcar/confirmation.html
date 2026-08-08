@@ -1,0 +1,27 @@
+<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Réservation confirmée | SWIPEUPCAR</title><meta name="robots" content="noindex">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"><link rel="stylesheet" href="assets/style.css"></head>
+<body><div id="nav"></div>
+<div class="container" style="padding:40px 20px;max-width:640px" id="page"></div>
+<div id="footer"></div>
+<script src="assets/app.js"></script>
+<script>
+const ref=new URLSearchParams(location.search).get('ref');const db=DB.get();const b=db.bookings.find(x=>x.ref===ref);const v=b&&db.vehicles.find(x=>x.id===b.vehicleId);
+document.getElementById('page').innerHTML=b?`
+<div class="card fade-up" style="padding:34px;text-align:center">
+  <div style="width:76px;height:76px;border-radius:50%;background:#E8F5E9;color:var(--green);display:grid;place-items:center;font-size:36px;margin:0 auto"><i class="fa-solid fa-check"></i></div>
+  <h1 style="font-size:26px;margin:16px 0 6px">Réservation confirmée !</h1>
+  <p style="color:var(--muted)">Référence <b>${b.ref}</b> — un email de confirmation vous a été envoyé.</p>
+  <div class="card" style="padding:18px;margin-top:20px;text-align:left">
+    <div style="display:flex;gap:14px;align-items:center"><img src="${v.images[0]}" style="width:96px;height:64px;object-fit:cover;border-radius:10px"><div><b>${v.brand} ${v.model}</b><div style="color:var(--muted);font-size:14px">${new Date(b.from).toLocaleDateString('fr-FR')} → ${new Date(b.to).toLocaleDateString('fr-FR')} • ${b.days} jour(s)</div></div></div>
+    <div style="display:flex;justify-content:space-between;margin-top:14px;padding-top:12px;border-top:1px solid var(--line)"><span>Montant payé</span><b>${money(b.total)}</b></div>
+    <div style="display:flex;justify-content:space-between;color:var(--muted);font-size:14px"><span>Commission SWIPEUPCAR (5%)</span><span>${money(b.commission)}</span></div>
+  </div>
+  <div style="display:flex;gap:10px;justify-content:center;margin-top:22px;flex-wrap:wrap">
+    <a href="compte.html" class="btn btn-red" data-testid="go-account">Voir mes réservations</a>
+    <a href="messages.html?to=${b.ownerId}&v=${v.id}" class="btn btn-ghost">Contacter le loueur</a>
+  </div>
+  <p style="color:var(--muted);font-size:13px;margin-top:18px"><i class="fa-solid fa-circle-info"></i> La gestion de la location (remise des clés, état des lieux...) se fait directement avec le loueur selon ses conditions.</p>
+</div>`:'<div class="card" style="padding:40px;text-align:center"><h2>Réservation introuvable</h2><a href="index.html" class="btn btn-red">Accueil</a></div>';
+</script></body></html>

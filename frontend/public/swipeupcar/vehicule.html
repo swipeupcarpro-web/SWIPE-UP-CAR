@@ -1,0 +1,68 @@
+<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Fiche véhicule | SWIPEUPCAR</title><meta name="description" content="Détails du véhicule, équipements, conditions et réservation en ligne.">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"><link rel="stylesheet" href="assets/style.css"></head>
+<body><div id="nav"></div>
+<div class="container" style="padding:22px 20px" id="page"></div>
+<div id="footer"></div><div id="mnav"></div>
+<script src="assets/app.js"></script>
+<script>
+const id=new URLSearchParams(location.search).get('id');
+const db=DB.get();const v=db.vehicles.find(x=>x.id===id);const owner=db.users.find(u=>u.id===(v&&v.owner));
+if(!v){document.getElementById('page').innerHTML='<div class="card" style="padding:50px;text-align:center"><h2>Véhicule introuvable</h2><a href="location.html" class="btn btn-red" style="margin-top:12px">Retour aux résultats</a></div>';}
+else{
+const spec=(i,l,val)=>`<div style="display:flex;gap:10px;align-items:center;padding:8px 0"><i class="fa-solid ${i}" style="color:var(--red);width:20px"></i><span style="color:var(--muted);font-size:14px;width:110px">${l}</span><b>${val}</b></div>`;
+document.getElementById('page').innerHTML=`
+<a href="location.html" style="color:var(--muted);font-size:14px"><i class="fa-solid fa-arrow-left"></i> Retour</a>
+<div style="display:grid;grid-template-columns:1.5fr 1fr;gap:30px;margin-top:14px" class="veh-grid">
+ <div>
+  <img id="mainImg" src="${v.images[0]}" style="width:100%;border-radius:18px;aspect-ratio:16/10;object-fit:cover" alt="${v.brand} ${v.model}">
+  <div style="display:flex;gap:10px;margin-top:10px">${v.images.map((im,i)=>`<img src="${im}" onclick="document.getElementById('mainImg').src='${im}'" style="width:90px;height:64px;object-fit:cover;border-radius:10px;cursor:pointer;border:2px solid ${i===0?'var(--red)':'transparent'}">`).join('')}</div>
+  <div style="margin-top:24px"><h1 style="font-size:30px;margin:0">${v.brand} ${v.model}</h1>
+   <div style="color:var(--muted);margin-top:4px">${v.year} • ${v.city} (${v.dept}) • <i class="fa-solid fa-star" style="color:var(--amber)"></i> ${v.rating.toFixed(1)} (${v.reviews} avis)</div></div>
+  <p style="margin-top:14px;color:#40382f;line-height:1.6">${v.desc}</p>
+  <h3 style="margin-top:20px">Caractéristiques</h3>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 24px">
+   ${spec('fa-calendar','Année',v.year)}${spec('fa-road','Kilométrage',v.km.toLocaleString('fr-FR')+' km')}${spec('fa-bolt','Puissance',v.power+' ch')}${spec('fa-gas-pump','Carburant',v.fuel)}${spec('fa-gear','Boîte',v.gear)}${spec('fa-user-group','Places',v.seats)}${spec('fa-door-open','Portes',v.doors)}${spec('fa-palette','Couleur',v.color)}
+  </div>
+  <h3 style="margin-top:20px">Équipements</h3>
+  <div style="display:flex;flex-wrap:wrap;gap:8px">${v.features.map(f=>`<span class="chip"><i class="fa-solid fa-check" style="color:var(--green)"></i> ${f}</span>`).join('')}</div>
+  <h3 style="margin-top:20px">Conditions</h3>
+  <div class="card" style="padding:16px;display:grid;grid-template-columns:1fr 1fr;gap:10px 20px">
+   ${spec('fa-id-card','Âge min.',v.minAge+' ans')}${spec('fa-address-card','Permis','Requis, > 2 ans')}${spec('fa-route','Km inclus',v.mileageInc+' km/jour')}${spec('fa-shield','Caution',money(v.deposit))}${spec('fa-gas-pump','Carburant','Plein à rendre')}${spec('fa-rotate-left','Annulation','Gratuite 48h avant')}
+  </div>
+  <!-- Owner -->
+  <h3 style="margin-top:20px">Le loueur</h3>
+  <div class="card" style="padding:18px;display:flex;gap:14px;align-items:center">
+   <span style="width:54px;height:54px;border-radius:50%;background:var(--carbon);color:#fff;display:grid;place-items:center;font-weight:700;font-size:20px">${owner.firstName[0]}</span>
+   <div style="flex:1"><div style="font-weight:700;font-size:17px">${owner.firstName} ${owner.company?'• '+owner.company:''} ${owner.verified?'<span class="chip badge-verified" style="font-size:12px"><i class="fa-solid fa-circle-check"></i> Vérifié</span>':''}</div>
+   <div style="color:var(--muted);font-size:14px;margin-top:4px"><i class="fa-solid fa-star" style="color:var(--amber)"></i> ${owner.rating} • ${owner.rentals} locations • Depuis ${owner.since} • ${owner.satisfaction}% satisfaction</div></div>
+   <button class="btn btn-ghost" onclick="contactOwner()" data-testid="contact-owner"><i class="fa-regular fa-comment"></i> Contacter</button>
+  </div>
+  <p style="color:var(--muted);font-size:12px;margin-top:8px"><i class="fa-solid fa-lock"></i> Pour votre sécurité, les coordonnées ne sont partagées qu'après réservation.</p>
+ </div>
+ <!-- Booking box -->
+ <div><div class="card" style="padding:22px;position:sticky;top:80px">
+   <div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font-size:30px;font-weight:800">${v.price} €</span><span style="color:var(--muted)">/ jour</span></div>
+   <div style="margin-top:16px"><label class="label">Départ</label><input class="input" type="date" id="bFrom" min="${todayISO()}" data-testid="book-from"></div>
+   <div style="margin-top:12px"><label class="label">Retour</label><input class="input" type="date" id="bTo" min="${todayISO()}" data-testid="book-to"></div>
+   <div id="calc" style="margin-top:16px;color:var(--muted);font-size:14px"></div>
+   <button class="btn btn-red" style="width:100%;margin-top:16px" id="reserveBtn" data-testid="reserve-btn">Réserver</button>
+   <button class="btn btn-ghost" style="width:100%;margin-top:8px" id="favBtn" onclick="const a=toggleFav('${v.id}');this.innerHTML=a?'<i class=\\'fa-solid fa-heart\\'></i> Dans vos favoris':'<i class=\\'fa-regular fa-heart\\'></i> Ajouter aux favoris'">${isFav(v.id)?'<i class="fa-solid fa-heart"></i> Dans vos favoris':'<i class="fa-regular fa-heart"></i> Ajouter aux favoris'}</button>
+   <p style="color:var(--muted);font-size:12px;margin-top:12px;text-align:center"><i class="fa-solid fa-lock"></i> Paiement sécurisé via SWIPEUPCAR</p>
+ </div></div>
+</div>`;
+const bf=document.getElementById('bFrom'),bt=document.getElementById('bTo');
+bf.value=new URLSearchParams(location.search).get('from')||todayISO();
+bt.value=new URLSearchParams(location.search).get('to')||addDays(todayISO(),3);
+function calc(){const f=bf.value,t=bt.value;if(!f||!t||t<=f){document.getElementById('calc').innerHTML='<span style="color:var(--red)">Sélectionnez des dates valides.</span>';return}const d=daysBetween(f,t);const tot=d*v.price;const comm=Math.round(tot*db.settings.commission);
+ const blocked=overlaps(v.id,f,t);
+ document.getElementById('calc').innerHTML=`<div style="display:flex;justify-content:space-between;padding:4px 0">${v.price} € × ${d} jour(s)<b>${money(tot)}</b></div><div style="display:flex;justify-content:space-between;padding:4px 0;font-size:12px">dont commission SWIPEUPCAR (5%)<span>${money(comm)}</span></div><div style="display:flex;justify-content:space-between;padding:8px 0;border-top:1px solid var(--line);margin-top:6px;font-size:17px"><b>Total</b><b>${money(tot)}</b></div>${blocked?'<div style="color:var(--red);font-weight:600">⚠ Indisponible sur ces dates</div>':''}`;
+}
+bf.onchange=bt.onchange=calc;calc();
+document.getElementById('reserveBtn').onclick=()=>{const f=bf.value,t=bt.value;if(!f||!t||t<=f){toast('Sélectionnez des dates valides');return}if(overlaps(v.id,f,t)){toast('Véhicule indisponible sur ces dates');return}location.href=`reservation.html?id=${v.id}&from=${f}&to=${t}`};
+window.contactOwner=()=>{if(!Session.get()){location.href='connexion.html';return}location.href='messages.html?to='+owner.id+'&v='+v.id};
+}
+</script>
+<style>@media(max-width:860px){.veh-grid{grid-template-columns:1fr!important}}</style>
+</body></html>

@@ -1,0 +1,35 @@
+<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Connexion | SWIPEUPCAR</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"><link rel="stylesheet" href="assets/style.css"></head>
+<body><div id="nav"></div>
+<div class="container" style="padding:40px 20px;max-width:440px">
+  <div class="card" style="padding:30px">
+    <h1 style="font-size:26px;margin:0 0 4px">Se connecter</h1>
+    <p style="color:var(--muted);margin-top:0">Accédez à votre espace SWIPEUPCAR.</p>
+    <form id="loginForm" style="margin-top:16px">
+      <label class="label">Email</label><input class="input" type="email" name="email" required data-testid="login-email">
+      <label class="label" style="margin-top:12px">Mot de passe</label><input class="input" type="password" name="password" required data-testid="login-password">
+      <div id="err" style="color:var(--red);font-size:14px;margin-top:10px;display:none"></div>
+      <button class="btn btn-red" style="width:100%;margin-top:18px" data-testid="login-submit">Connexion</button>
+    </form>
+    <p style="text-align:center;margin-top:16px;font-size:14px">Pas encore de compte ? <a href="inscription.html" style="color:var(--red);font-weight:700">S'inscrire</a></p>
+    <div class="card" style="padding:14px;margin-top:18px;background:var(--cream-2)">
+      <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase">Comptes de démonstration</div>
+      <div style="font-size:13px;margin-top:8px;line-height:1.7">
+        👤 Client : <b>client@swipeupcar.fr</b> / client123<br>
+        🚗 Loueur : <b>loueur@swipeupcar.fr</b> / loueur123<br>
+        🛠 Admin : <b>admin@swipeupcar.fr</b> / admin123
+      </div>
+    </div>
+  </div>
+</div>
+<div id="footer"></div>
+<script src="assets/app.js"></script>
+<script>
+document.getElementById('loginForm').onsubmit=e=>{e.preventDefault();const f=new FormData(e.target);const u=login(f.get('email'),f.get('password'));
+ if(!u){const el=document.getElementById('err');el.style.display='block';el.textContent='Email ou mot de passe incorrect.';return}
+ const next=new URLSearchParams(location.search).get('next');
+ location.href=next||(u.role==='ADMIN'?'admin.html':u.role==='LOUEUR'?'loueur.html':'compte.html');
+};
+</script></body></html>

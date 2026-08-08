@@ -1,0 +1,24 @@
+<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Services automobiles — Bientôt disponibles | SWIPEUPCAR</title><meta name="description" content="Entretien, pneus, pièces auto et lavage : bientôt disponibles sur SWIPEUPCAR.">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"><link rel="stylesheet" href="assets/style.css"></head>
+<body><div id="nav"></div>
+<div class="container" style="padding:50px 20px;max-width:760px;text-align:center" id="page"></div>
+<div id="footer"></div><div id="mnav"></div>
+<script src="assets/app.js"></script>
+<script>
+const svc={entretien:['🔧','Entretien automobile','Vidange, révision, freins... Réservez un créneau chez un garage vérifié.'],pneus:['🛞','Pneus','Achat et montage de pneus près de chez vous.'],pieces:['🧩','Pièces auto','Trouvez et commandez des pièces détachées de confiance.'],lavage:['🧽','Lavage / detailing','Nettoyage intérieur et extérieur, detailing premium.']};
+const s=new URLSearchParams(location.search).get('s');const data=svc[s];
+document.getElementById('page').innerHTML=`
+${data?`<div style="font-size:56px">${data[0]}</div><h1 style="font-size:34px;margin:10px 0 6px">${data[1]}</h1><p style="color:var(--muted);font-size:18px">${data[2]}</p>`:`<h1 style="font-size:34px">Nos futurs services</h1><p style="color:var(--muted);font-size:18px">SWIPEUPCAR devient la plateforme automobile complète.</p>`}
+<div class="chip" style="background:#FFF3E0;color:var(--amber);border:none;margin-top:16px;font-size:15px"><i class="fa-solid fa-clock"></i> Service bientôt disponible</div>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin:34px 0">
+ ${Object.entries(svc).map(([k,v])=>`<a href="services.html?s=${k}" class="card" style="padding:20px;display:block;${k===s?'border-color:var(--red)':''}"><div style="font-size:30px">${v[0]}</div><b style="display:block;margin-top:8px">${v[1]}</b></a>`).join('')}
+</div>
+<div class="card" style="padding:26px;text-align:left">
+ <h3 style="margin-top:0">Soyez informé du lancement</h3>
+ <form id="notif" style="display:flex;gap:10px;flex-wrap:wrap"><input class="input" type="email" placeholder="Votre email" required style="flex:1;min-width:220px"><button class="btn btn-red">Me prévenir</button></form>
+ <p style="color:var(--muted);font-size:13px;margin-top:10px">En attendant, la <a href="location.html" style="color:var(--red);font-weight:700">location de véhicules</a> est déjà 100% opérationnelle.</p>
+</div>`;
+document.getElementById('notif').onsubmit=e=>{e.preventDefault();e.target.reset();toast('Merci ! Nous vous préviendrons du lancement.')};
+</script></body></html>

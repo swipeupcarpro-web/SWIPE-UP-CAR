@@ -1,0 +1,97 @@
+<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Espace loueur | SWIPEUPCAR</title><meta name="robots" content="noindex">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"><link rel="stylesheet" href="assets/style.css"></head>
+<body><div id="nav"></div>
+<div class="container" style="padding:22px 20px;display:grid;grid-template-columns:230px 1fr;gap:24px" class="dash-grid">
+  <aside class="sidebar card hide-mobile" style="padding:14px;height:fit-content;position:sticky;top:80px">
+    <a data-t="dash" class="active"><i class="fa-solid fa-gauge"></i> Tableau de bord</a>
+    <a data-t="vehicles"><i class="fa-solid fa-car"></i> Mes véhicules</a>
+    <a data-t="add"><i class="fa-solid fa-plus"></i> Ajouter un véhicule</a>
+    <a data-t="bookings"><i class="fa-solid fa-calendar-check"></i> Réservations</a>
+    <a data-t="calendar"><i class="fa-regular fa-calendar"></i> Calendrier</a>
+    <a href="messages.html"><i class="fa-regular fa-comment"></i> Messages</a>
+    <a data-t="revenue"><i class="fa-solid fa-euro-sign"></i> Revenus</a>
+    <a data-t="reviews"><i class="fa-regular fa-star"></i> Avis</a>
+  </aside>
+  <main id="main"></main>
+</div>
+<div id="footer"></div><div id="mnav"></div>
+<script src="assets/app.js"></script>
+<script>
+const u=requireAuth('LOUEUR');
+if(u){
+ if(u.proStatus&&u.proStatus!=='Validé'){document.getElementById('main').closest('.dash-grid');}
+ const tabs=[...document.querySelectorAll('.sidebar a[data-t]')];
+ tabs.forEach(t=>t.onclick=()=>{tabs.forEach(x=>x.classList.remove('active'));t.classList.add('active');render(t.dataset.t)});
+ const myV=()=>DB.get().vehicles.filter(v=>v.owner===u.id);
+ const myB=()=>DB.get().bookings.filter(b=>b.ownerId===u.id).sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt));
+ function vStatus(s){const m={approved:['#E8F5E9','var(--green)','Publié'],pending:['#FFF3E0','var(--amber)','En attente'],draft:['#eef','#556','Brouillon'],rejected:['#FDEAEA','var(--red)','Refusé']};const[bg,c,l]=m[s]||m.draft;return `<span class="chip" style="background:${bg};color:${c};border:none">${l}</span>`}
+ function banner(){if(u.proStatus&&u.proStatus!=='Validé')return `<div class="card" style="padding:16px;background:#FFF3E0;border-color:#ffe0b2;margin-bottom:16px"><b><i class="fa-solid fa-clock" style="color:var(--amber)"></i> Compte ${u.proStatus}</b><div style="font-size:14px;color:#7a5b1a">Votre dossier est en cours de vérification. Vous pourrez publier après validation par l'administration. (Démo : demandez à l'admin de vous valider, ou publiez en brouillon.)</div></div>`;return ''}
+ function render(t){
+  const db=DB.get();const M=document.getElementById('main');
+  if(t==='dash'){
+    const bk=myB();const rev=bk.reduce((s,b)=>s+b.ownerAmount,0);const vs=myV();
+    M.innerHTML=banner()+`<h1 style="font-size:26px">Tableau de bord</h1>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin-top:16px">
+     <div class="stat"><div class="num" style="color:var(--green)">${money(rev)}</div><div style="color:var(--muted)">Revenus (net 95%)</div></div>
+     <div class="stat"><div class="num">${bk.length}</div><div style="color:var(--muted)">Réservations</div></div>
+     <div class="stat"><div class="num">${vs.filter(v=>v.status==='approved').length}</div><div style="color:var(--muted)">Véhicules actifs</div></div>
+     <div class="stat"><div class="num">${u.rating||'—'} ★</div><div style="color:var(--muted)">Note moyenne</div></div>
+    </div>
+    <h2 style="font-size:20px;margin-top:24px">Dernières réservations</h2>${bk.length?bTable(bk.slice(0,5)):`<div class="card" style="padding:30px;text-align:center;margin-top:12px;color:var(--muted)">Aucune réservation pour le moment.</div>`}`;
+  } else if(t==='vehicles'){
+    const vs=myV();M.innerHTML=banner()+`<div style="display:flex;justify-content:space-between;align-items:center"><h1 style="font-size:26px;margin:0">Mes véhicules</h1><button class="btn btn-red" onclick="document.querySelector('[data-t=add]').click()">+ Ajouter</button></div>
+    ${vs.length?`<div style="display:grid;gap:12px;margin-top:16px">${vs.map(v=>`<div class="card" style="padding:14px;display:flex;gap:14px;align-items:center;flex-wrap:wrap"><img src="${v.images[0]}" style="width:100px;height:66px;object-fit:cover;border-radius:10px"><div style="flex:1;min-width:150px"><b>${v.brand} ${v.model}</b><div style="color:var(--muted);font-size:13px">${v.year} • ${v.price} €/j • ${v.city}</div><div style="margin-top:6px">${vStatus(v.status)}</div></div><div style="display:flex;gap:8px">${v.status==='draft'?`<button class="btn btn-red" style="padding:6px 12px;font-size:13px" onclick="submitV('${v.id}')">Soumettre</button>`:''}<a href="vehicule.html?id=${v.id}" class="btn btn-ghost" style="padding:6px 12px;font-size:13px">Voir</a><button class="btn btn-ghost" style="padding:6px 12px;font-size:13px" onclick="delV('${v.id}')"><i class="fa-solid fa-trash"></i></button></div></div>`).join('')}</div>`:`<div class="card" style="padding:40px;text-align:center;margin-top:16px;color:var(--muted)"><i class="fa-solid fa-car" style="font-size:34px"></i><p>Aucun véhicule. Ajoutez-en un pour commencer.</p></div>`}`;
+  } else if(t==='add'){
+    M.innerHTML=banner()+`<h1 style="font-size:26px">Ajouter un véhicule</h1><form id="addForm" class="card" style="padding:22px;margin-top:14px">
+     <h3 style="margin-top:0">Informations générales</h3>
+     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div><label class="label">Marque</label><input class="input" name="brand" required></div>
+      <div><label class="label">Modèle</label><input class="input" name="model" required></div>
+      <div><label class="label">Année</label><input class="input" type="number" name="year" value="2022" required></div>
+      <div><label class="label">Catégorie</label><select class="input" name="cat">${['Citadine','Berline','SUV','Premium','Sportive','Utilitaire'].map(c=>`<option>${c}</option>`).join('')}</select></div>
+      <div><label class="label">Kilométrage</label><input class="input" type="number" name="km" value="20000"></div>
+      <div><label class="label">Puissance (ch)</label><input class="input" type="number" name="power" value="120"></div>
+      <div><label class="label">Carburant</label><select class="input" name="fuel">${['Essence','Diesel','Hybride','Électrique'].map(c=>`<option>${c}</option>`).join('')}</select></div>
+      <div><label class="label">Boîte</label><select class="input" name="gear"><option>Manuelle</option><option>Automatique</option></select></div>
+      <div><label class="label">Places</label><input class="input" type="number" name="seats" value="5"></div>
+      <div><label class="label">Portes</label><input class="input" type="number" name="doors" value="5"></div>
+      <div><label class="label">Couleur</label><input class="input" name="color" value="Gris"></div>
+      <div><label class="label">Ville</label><input class="input" name="city" required></div>
+     </div>
+     <h3>Équipements</h3><div style="display:flex;flex-wrap:wrap;gap:12px">${['GPS','CarPlay','Android Auto','Caméra','Climatisation','Toit panoramique','Siège bébé'].map(f=>`<label style="display:flex;gap:6px;font-size:14px"><input type="checkbox" name="feat" value="${f}"> ${f}</label>`).join('')}</div>
+     <h3>Photos</h3><input class="input" type="file" multiple accept="image/*" id="photos"><p style="color:var(--muted);font-size:12px">Les photos sont compressées et optimisées. La 1re photo est la photo principale. (Démo : une image d'exemple sera utilisée.)</p>
+     <h3>Tarification</h3><div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px"><div><label class="label">Prix / jour (€)</label><input class="input" type="number" name="price" required></div><div><label class="label">Prix week-end</label><input class="input" type="number" name="priceWe"></div><div><label class="label">Prix semaine</label><input class="input" type="number" name="priceWeek"></div></div>
+     <h3>Conditions</h3><div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px"><div><label class="label">Âge min.</label><input class="input" type="number" name="minAge" value="21"></div><div><label class="label">Km inclus/jour</label><input class="input" type="number" name="mileageInc" value="250"></div><div><label class="label">Caution (€)</label><input class="input" type="number" name="deposit" value="1000"></div></div>
+     <label class="label" style="margin-top:12px">Description</label><textarea class="input" name="desc" rows="3"></textarea>
+     <div style="display:flex;gap:10px;margin-top:18px"><button class="btn btn-ghost" type="button" onclick="saveVehicle('draft')">Enregistrer en brouillon</button><button class="btn btn-red" type="button" onclick="saveVehicle('pending')" data-testid="submit-vehicle">Soumettre à validation</button></div>
+    </form>`;
+  } else if(t==='bookings'){
+    const bk=myB();M.innerHTML=`<h1 style="font-size:26px">Réservations</h1>${bk.length?bTable(bk):`<div class="card" style="padding:40px;text-align:center;margin-top:16px;color:var(--muted)">Aucune réservation.</div>`}`;
+  } else if(t==='calendar'){
+    const vs=myV();M.innerHTML=`<h1 style="font-size:26px">Calendrier</h1><p style="color:var(--muted)">🟢 Disponible &nbsp; 🔴 Réservé &nbsp; ⚫ Bloqué</p>${vs.map(v=>calGrid(v)).join('')||'<div class="card" style="padding:30px;text-align:center;color:var(--muted)">Ajoutez un véhicule.</div>'}`;
+  } else if(t==='revenue'){
+    const bk=myB();const gross=bk.reduce((s,b)=>s+b.total,0);const comm=bk.reduce((s,b)=>s+b.commission,0);
+    M.innerHTML=`<h1 style="font-size:26px">Revenus</h1><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin-top:16px">
+     <div class="stat"><div class="num">${money(gross)}</div><div style="color:var(--muted)">Chiffre d'affaires</div></div>
+     <div class="stat"><div class="num" style="color:var(--red)">− ${money(comm)}</div><div style="color:var(--muted)">Commission (5%)</div></div>
+     <div class="stat"><div class="num" style="color:var(--green)">${money(gross-comm)}</div><div style="color:var(--muted)">Net à recevoir</div></div>
+    </div><div class="table-wrap card" style="padding:8px;margin-top:16px"><table><thead><tr><th>Réf.</th><th>Véhicule</th><th>Brut</th><th>Commission</th><th>Net</th><th>Statut</th></tr></thead><tbody>${bk.map(b=>{const v=DB.get().vehicles.find(x=>x.id===b.vehicleId);return `<tr><td>${b.ref}</td><td>${v.brand} ${v.model}</td><td>${money(b.total)}</td><td style="color:var(--red)">${money(b.commission)}</td><td style="color:var(--green)"><b>${money(b.ownerAmount)}</b></td><td>Reversé</td></tr>`}).join('')||'<tr><td colspan=6 style="text-align:center;color:var(--muted)">Aucun revenu</td></tr>'}</tbody></table></div>`;
+  } else if(t==='reviews'){
+    M.innerHTML=`<h1 style="font-size:26px">Avis reçus</h1><div class="card" style="padding:20px;margin-top:14px"><div style="font-size:30px;font-weight:800">${u.rating||'—'} ★</div><div style="color:var(--muted)">${u.rentals||0} locations • ${u.satisfaction||0}% satisfaction</div></div><p style="color:var(--muted);margin-top:12px">Les avis clients liés à vos réservations réelles s'afficheront ici.</p>`;
+  }
+ }
+ function bTable(bk){return `<div class="table-wrap card" style="padding:8px;margin-top:14px"><table><thead><tr><th>Réf.</th><th>Véhicule</th><th>Client</th><th>Dates</th><th>Net</th></tr></thead><tbody>${bk.map(b=>{const db=DB.get();const v=db.vehicles.find(x=>x.id===b.vehicleId);const c=db.users.find(x=>x.id===b.userId);return `<tr><td>${b.ref}</td><td>${v.brand} ${v.model}</td><td>${c?c.firstName:'—'}</td><td style="font-size:13px">${new Date(b.from).toLocaleDateString('fr-FR')}→${new Date(b.to).toLocaleDateString('fr-FR')}</td><td style="color:var(--green)"><b>${money(b.ownerAmount)}</b></td></tr>`}).join('')}</tbody></table></div>`}
+ function calGrid(v){const db=DB.get();const start=new Date();let cells='';for(let i=0;i<28;i++){const d=addDays(todayISO(),i);const booked=db.bookings.some(b=>b.vehicleId===v.id&&d>=b.from&&d<b.to&&b.status==='confirmed');cells+=`<div title="${d}" style="aspect-ratio:1;border-radius:8px;display:grid;place-items:center;font-size:12px;background:${booked?'#FDEAEA':'#E8F5E9'};color:${booked?'var(--red)':'var(--green)'}">${new Date(d).getDate()}</div>`}return `<div class="card" style="padding:16px;margin-top:14px"><b>${v.brand} ${v.model}</b><div style="display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-top:10px">${cells}</div></div>`}
+ window.saveVehicle=(status)=>{const fm=document.getElementById('addForm');if(status==='pending'&&!fm.reportValidity())return;const f=Object.fromEntries(new FormData(fm));const feats=[...fm.querySelectorAll('[name=feat]:checked')].map(x=>x.value);const db=DB.get();const imgs=[Object.values(IMG)[Math.floor(Math.random()*8)]];
+  db.vehicles.push({id:uid('V'),owner:u.id,brand:f.brand,model:f.model,year:+f.year,cat:f.cat,km:+f.km,power:+f.power,fuel:f.fuel,gear:f.gear,seats:+f.seats,doors:+f.doors,color:f.color,price:+f.price,priceWe:+f.priceWe||0,priceWeek:+f.priceWeek||0,city:f.city,dept:'—',rating:0,reviews:0,status,deposit:+f.deposit,minAge:+f.minAge,mileageInc:+f.mileageInc,features:feats,images:imgs,desc:f.desc||''});
+  DB.set(db);if(status==='pending')notify('A001','Nouveau véhicule à valider : '+f.brand+' '+f.model);
+  toast(status==='draft'?'Brouillon enregistré':'Véhicule soumis à validation');document.querySelector('[data-t=vehicles]').click();};
+ window.submitV=(id)=>{const db=DB.get();const v=db.vehicles.find(x=>x.id===id);v.status='pending';DB.set(db);notify('A001','Véhicule à valider : '+v.brand+' '+v.model);toast('Soumis à validation');document.querySelector('[data-t=vehicles]').click();};
+ window.delV=(id)=>{if(!confirm('Supprimer ce véhicule ?'))return;const db=DB.get();db.vehicles=db.vehicles.filter(v=>v.id!==id);DB.set(db);toast('Véhicule supprimé');document.querySelector('[data-t=vehicles]').click();};
+ render('dash');
+}
+</script>
+<style>@media(max-width:860px){.dash-grid{grid-template-columns:1fr!important}}</style>
+</body></html>

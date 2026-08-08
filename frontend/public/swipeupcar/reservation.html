@@ -1,0 +1,51 @@
+<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Réservation & paiement | SWIPEUPCAR</title><meta name="robots" content="noindex">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"><link rel="stylesheet" href="assets/style.css"></head>
+<body><div id="nav"></div>
+<div class="container" style="padding:26px 20px;max-width:820px" id="page"></div>
+<div id="footer"></div>
+<script src="assets/app.js"></script>
+<script>
+const P=new URLSearchParams(location.search);const db=DB.get();const v=db.vehicles.find(x=>x.id===P.get('id'));
+const from=P.get('from'),to=P.get('to');const u=Session.get();
+if(!v){document.getElementById('page').innerHTML='<div class="card" style="padding:40px;text-align:center"><h2>Réservation invalide</h2><a href="location.html" class="btn btn-red">Retour</a></div>';}
+else if(!u){location.href='connexion.html?next='+encodeURIComponent('reservation.html'+location.search);}
+else{
+const d=daysBetween(from,to);const tot=d*v.price;const comm=Math.round(tot*db.settings.commission);const owner=db.users.find(x=>x.id===v.owner);
+document.getElementById('page').innerHTML=`
+<h1 style="font-size:26px">Finaliser votre réservation</h1>
+<div style="display:grid;grid-template-columns:1fr 340px;gap:24px;margin-top:16px" class="res-grid">
+ <div class="card" style="padding:22px">
+  <h3 style="margin-top:0">Paiement sécurisé</h3>
+  <div class="chip" style="background:#fff"><i class="fa-brands fa-cc-stripe" style="color:#635bff"></i> Traité via Stripe Connect (mode test)</div>
+  <p style="color:var(--muted);font-size:13px;margin-top:8px">En production, le paiement passe par Stripe Connect : le client paie SWIPEUPCAR, la commission de 5 % est prélevée automatiquement et le reste est reversé au loueur. <b>Ceci est une démo — aucun débit réel.</b></p>
+  <form id="payForm" style="margin-top:16px">
+    <label class="label">Titulaire de la carte</label><input class="input" required value="${u.firstName} ${u.lastName||''}" data-testid="pay-name">
+    <label class="label" style="margin-top:12px">Numéro de carte</label><input class="input" required inputmode="numeric" placeholder="4242 4242 4242 4242" maxlength="19" id="cardNo" data-testid="pay-card">
+    <div style="display:flex;gap:12px;margin-top:12px"><div style="flex:1"><label class="label">Expiration</label><input class="input" required placeholder="12/28" maxlength="5" data-testid="pay-exp"></div><div style="flex:1"><label class="label">CVC</label><input class="input" required inputmode="numeric" placeholder="123" maxlength="4" data-testid="pay-cvc"></div></div>
+    <button class="btn btn-red" style="width:100%;margin-top:20px" id="payBtn" data-testid="pay-submit"><i class="fa-solid fa-lock"></i> Payer ${money(tot)}</button>
+    <p style="color:var(--muted);font-size:12px;text-align:center;margin-top:10px">Carte test : 4242 4242 4242 4242</p>
+  </form>
+ </div>
+ <div><div class="card" style="padding:20px;position:sticky;top:80px">
+   <img src="${v.images[0]}" style="width:100%;border-radius:12px;aspect-ratio:16/10;object-fit:cover">
+   <h3 style="margin:12px 0 2px">${v.brand} ${v.model}</h3>
+   <div style="color:var(--muted);font-size:14px">${v.city} • par ${owner.firstName}</div>
+   <div style="margin-top:14px;font-size:14px">
+    <div style="display:flex;justify-content:space-between;padding:4px 0"><span>Départ</span><b>${new Date(from).toLocaleDateString('fr-FR')}</b></div>
+    <div style="display:flex;justify-content:space-between;padding:4px 0"><span>Retour</span><b>${new Date(to).toLocaleDateString('fr-FR')}</b></div>
+    <div style="display:flex;justify-content:space-between;padding:4px 0"><span>${v.price} € × ${d} j</span><b>${money(tot)}</b></div>
+    <div style="display:flex;justify-content:space-between;padding:4px 0;color:var(--muted)"><span>Commission SWIPEUPCAR (5%)</span><span>${money(comm)}</span></div>
+    <div style="display:flex;justify-content:space-between;padding:10px 0;border-top:1px solid var(--line);margin-top:6px;font-size:18px"><b>Total à payer</b><b>${money(tot)}</b></div>
+   </div>
+ </div></div>
+</div>`;
+document.getElementById('cardNo').oninput=e=>{e.target.value=e.target.value.replace(/\D/g,'').replace(/(.{4})/g,'$1 ').trim()};
+document.getElementById('payForm').onsubmit=e=>{e.preventDefault();const b=document.getElementById('payBtn');b.disabled=true;b.innerHTML='<i class="fa-solid fa-spinner fa-spin"></i> Traitement du paiement...';
+ setTimeout(()=>{const r=createBooking({vehicleId:v.id,from,to});if(r.err){toast(r.err);b.disabled=false;b.innerHTML='Réessayer';return}location.href='confirmation.html?ref='+r.booking.ref},1300);
+};
+}
+</script>
+<style>@media(max-width:860px){.res-grid{grid-template-columns:1fr!important}}</style>
+</body></html>
