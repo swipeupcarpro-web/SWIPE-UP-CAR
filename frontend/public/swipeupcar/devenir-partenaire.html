@@ -1,0 +1,34 @@
+<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Devenir partenaire | SWIPEUPCAR</title><meta name="description" content="Garages, centres pneus, lavage : recevez des rendez-vous clients sur SWIPEUPCAR.">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"><link rel="stylesheet" href="assets/style.css"></head>
+<body><div id="nav"></div>
+<section class="container" style="padding:40px 20px;max-width:520px">
+  <div style="text-align:center"><span class="chip"><i class="fa-solid fa-briefcase" style="color:var(--red)"></i> Partenaire services</span>
+  <h1 style="font-size:34px;margin:14px 0 6px">Recevez des rendez-vous clients</h1>
+  <p style="color:var(--muted)">Garage, pneus ou lavage : publiez vos prestations et recevez des RDV. Sans paiement en ligne, sans abonnement.</p></div>
+  <div class="card" style="padding:26px;margin-top:20px">
+    <form id="proForm">
+      <label class="label">Type d'activité</label>
+      <select class="input" name="proType" data-testid="pt-type"><option value="GARAGE">🔧 Entretien / Garage</option><option value="PNEUMATIQUE">🛞 Pneus</option><option value="LAVAGE">🧽 Lavage / detailing</option></select>
+      <div style="display:flex;gap:12px;margin-top:12px"><div style="flex:1"><label class="label">Prénom</label><input class="input" name="firstName" required></div><div style="flex:1"><label class="label">Nom</label><input class="input" name="lastName"></div></div>
+      <label class="label" style="margin-top:12px">Nom de l'entreprise</label><input class="input" name="company" required>
+      <label class="label" style="margin-top:12px">Ville</label><input class="input" name="city" required>
+      <label class="label" style="margin-top:12px">SIRET</label><input class="input" name="siret" placeholder="14 chiffres">
+      <label class="label" style="margin-top:12px">Email professionnel</label><input class="input" type="email" name="email" required>
+      <label class="label" style="margin-top:12px">Téléphone</label><input class="input" name="phone">
+      <label class="label" style="margin-top:12px">Mot de passe</label><input class="input" type="password" name="password" minlength="6" required>
+      <div id="err" style="color:var(--red);font-size:14px;margin-top:10px;display:none"></div>
+      <button class="btn btn-red" style="width:100%;margin-top:18px" data-testid="pt-submit">Soumettre ma candidature</button>
+      <p style="color:var(--muted);font-size:12px;text-align:center;margin-top:10px">Compte « En vérification » jusqu'à validation par notre équipe.</p>
+    </form>
+  </div>
+</section>
+<div id="footer"></div><div id="mnav"></div>
+<script src="assets/app.js"></script>
+<script>
+document.getElementById('proForm').onsubmit=e=>{e.preventDefault();const f=Object.fromEntries(new FormData(e.target));f.role='PRO';
+ const r=register(f);if(r.err){const el=document.getElementById('err');el.style.display='block';el.textContent=r.err;return}
+ toast('Candidature envoyée !');setTimeout(()=>location.href='pro.html',800);
+};
+</script></body></html>

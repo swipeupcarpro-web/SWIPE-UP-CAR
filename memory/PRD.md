@@ -26,5 +26,16 @@ index, location (recherche+filtres+tri), vehicule (fiche+réservation), reservat
 - P1 : carte géographique, SEO (sitemap/robots/OG dynamiques), vérification email, KYC documents.
 - P2 : modules Entretien/Pneus/Pièces/Lavage.
 
-## Note
-Démo front-end : le paiement et la persistance sont simulés côté client (localStorage). À remplacer par une vraie API + Stripe Connect avant mise en production.
+## Implémenté
+- Location véhicules (backend réel) : auth JWT, véhicules, réservations, commission 5% serveur, paiement (UI test), carte Leaflet, admin.
+- Emails transactionnels (Resend managé) : inscription, réservation, validation.
+- **Module RDV services (Entretien/Garage, Pneus, Lavage)** — sans commande ni paiement :
+  - `providers` (users role PRO + proType), prestations éditables, `appointments` (RDV) en base.
+  - Pages : services.html (annuaire par type), service.html (prise de RDV), devenir-partenaire.html, pro.html (dashboard prestataire), compte.html « Mes rendez-vous », admin Prestataires + RDV.
+  - Emails RDV client + prestataire. Validation prestataire par admin.
+- Comptes pro démo : garage@swipeupcar.fr / pneus@swipeupcar.fr / lavage@swipeupcar.fr (mdp pro123).
+
+## Backlog production
+- P0 : Stripe Connect réel (location), upload photos réel, vérif email, textes juridiques validés avocat.
+- P1 : favoris/messagerie/avis en base, annulations, domaine + déploiement.
+- P2 : Pièces auto (e-commerce), SEO.

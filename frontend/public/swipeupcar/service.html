@@ -1,0 +1,47 @@
+<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Prendre rendez-vous | SWIPEUPCAR</title><meta name="robots" content="noindex">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"><link rel="stylesheet" href="assets/style.css"></head>
+<body><div id="nav"></div>
+<div class="container" style="padding:22px 20px" id="page"></div>
+<div id="footer"></div><div id="mnav"></div>
+<script src="assets/app.js"></script>
+<script>
+const id=new URLSearchParams(location.search).get('id');
+const p=apiSync('/providers/'+id); const ok=p&&!p.error;
+const TYPE={GARAGE:['🔧','Entretien'],PNEUMATIQUE:['🛞','Pneus'],LAVAGE:['🧽','Lavage']};
+if(!ok){document.getElementById('page').innerHTML='<div class="card" style="padding:50px;text-align:center"><h2>Professionnel introuvable</h2><a href="services.html" class="btn btn-red">Retour</a></div>';}
+else{
+const t=TYPE[p.proType]||['🔧',''];
+document.getElementById('page').innerHTML=`
+<a href="services.html?s=${p.proType==='GARAGE'?'entretien':p.proType==='PNEUMATIQUE'?'pneus':'lavage'}" style="color:var(--muted);font-size:14px"><i class="fa-solid fa-arrow-left"></i> Retour</a>
+<div style="display:grid;grid-template-columns:1.4fr 1fr;gap:30px;margin-top:12px" class="sv-grid">
+ <div>
+  <div style="font-size:44px">${t[0]}</div>
+  <h1 style="font-size:30px;margin:4px 0">${p.company||p.firstName}</h1>
+  <div style="color:var(--muted)"><i class="fa-solid fa-location-dot"></i> ${p.city} • ${t[1]} • <i class="fa-solid fa-star" style="color:var(--amber)"></i> ${(p.rating||0).toFixed(1)} • ${p.jobs||0} interventions ${p.verified?'• <span style="color:var(--green)"><i class="fa-solid fa-circle-check"></i> Vérifié</span>':''}</div>
+  <p style="margin-top:12px;color:#40382f">${p.description||''}</p>
+  <h3 style="margin-top:20px">Prestations</h3>
+  <div id="services">${(p.services||[]).map((sv,i)=>`<label class="card" style="padding:14px;display:flex;align-items:center;gap:12px;margin-bottom:10px;cursor:pointer"><input type="radio" name="svc" value="${i}" ${i===0?'checked':''}><div style="flex:1"><b>${sv.name}</b>${sv.duration?`<span style="color:var(--muted);font-size:13px"> • ${sv.duration}</span>`:''}</div><b>${sv.price} €</b></label>`).join('')||'<p style="color:var(--muted)">Aucune prestation listée.</p>'}</div>
+  <p style="color:var(--muted);font-size:12px;margin-top:6px"><i class="fa-solid fa-lock"></i> Coordonnées partagées après confirmation du RDV. Aucun paiement en ligne pour les RDV.</p>
+ </div>
+ <div><div class="card" style="padding:22px;position:sticky;top:80px">
+   <h3 style="margin-top:0">Réserver un créneau</h3>
+   <label class="label">Date</label><input class="input" type="date" id="d" min="${todayISO()}" value="${addDays(todayISO(),1)}" data-testid="rdv-date">
+   <label class="label" style="margin-top:12px">Heure</label>
+   <select class="input" id="h" data-testid="rdv-time">${['08:00','09:00','10:00','11:00','14:00','15:00','16:00','17:00'].map(x=>`<option>${x}</option>`).join('')}</select>
+   <button class="btn btn-red" style="width:100%;margin-top:16px" id="book" data-testid="rdv-submit"><i class="fa-regular fa-calendar-check"></i> Confirmer le RDV</button>
+ </div></div>
+</div>`;
+document.getElementById('book').onclick=()=>{
+  if(!Session.get()){location.href='connexion.html?next='+encodeURIComponent('service.html?id='+id);return;}
+  const idx=+document.querySelector('input[name=svc]:checked').value;const sv=p.services[idx];
+  const b=document.getElementById('book');b.disabled=true;b.innerHTML='<i class="fa-solid fa-spinner fa-spin"></i> ...';
+  const r=apiSync('/appointments','POST',{providerId:id,serviceName:sv.name,price:sv.price,date:document.getElementById('d').value,time:document.getElementById('h').value});
+  if(r.error){toast(r.error);b.disabled=false;b.innerHTML='Réessayer';return;}
+  toast('RDV confirmé ! Réf '+r.ref);setTimeout(()=>location.href='compte.html#rdv',900);
+};
+}
+</script>
+<style>@media(max-width:860px){.sv-grid{grid-template-columns:1fr!important}}</style>
+</body></html>

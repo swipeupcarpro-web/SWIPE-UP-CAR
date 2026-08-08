@@ -86,7 +86,7 @@ function renderNav(){
   const u=Session.get(); let right;
   if(!u){ right=`<a href="connexion.html" class="nav-link hide-mobile">Se connecter</a><a href="inscription.html" class="btn btn-red" style="padding:9px 18px" data-testid="nav-signup">S'inscrire</a>`; }
   else{
-    const space=u.role==='ADMIN'?'admin.html':u.role==='LOUEUR'?'loueur.html':'compte.html';
+    const space=u.role==='ADMIN'?'admin.html':u.role==='LOUEUR'?'loueur.html':u.role==='PRO'?'pro.html':'compte.html';
     const nnotif=(DB.get().notifications[u.id]||[]).filter(n=>!n.read).length;
     right=`<a href="messages.html" class="nav-link hide-mobile" data-testid="nav-messages"><i class="fa-regular fa-comment"></i></a>
     <a href="${space}" class="nav-link hide-mobile" style="position:relative"><i class="fa-regular fa-bell"></i>${nnotif?`<span style="position:absolute;top:-2px;right:-8px;background:var(--red);color:#fff;font-size:10px;border-radius:999px;padding:1px 5px">${nnotif}</span>`:''}</a>
@@ -122,7 +122,7 @@ function renderFooter(){
   <style>.foot{display:block;color:#d7cfc0;font-size:14px;padding:5px 0}.foot:hover{color:#fff}.fh{font-size:13px;text-transform:uppercase;letter-spacing:.05em;color:#b8ae9f}</style>`;
 }
 function renderMobileNav(){
-  const u=Session.get(); const space=u?(u.role==='LOUEUR'?'loueur.html':u.role==='ADMIN'?'admin.html':'compte.html'):'connexion.html';
+  const u=Session.get(); const space=u?(u.role==='LOUEUR'?'loueur.html':u.role==='ADMIN'?'admin.html':u.role==='PRO'?'pro.html':'compte.html'):'connexion.html';
   const el=document.getElementById('mnav'); if(!el) return;
   el.innerHTML=`<div class="mobile-nav">
     <a href="index.html" class="mn"><i class="fa-solid fa-house"></i><span>Accueil</span></a>

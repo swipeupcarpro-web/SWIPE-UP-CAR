@@ -1,0 +1,61 @@
+<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Espace partenaire | SWIPEUPCAR</title><meta name="robots" content="noindex">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"><link rel="stylesheet" href="assets/style.css"></head>
+<body><div id="nav"></div>
+<div class="container" style="padding:22px 20px;display:grid;grid-template-columns:230px 1fr;gap:24px" class="dash-grid">
+  <aside class="sidebar card hide-mobile" style="padding:14px;height:fit-content;position:sticky;top:80px">
+    <a data-t="dash" class="active"><i class="fa-solid fa-gauge"></i> Tableau de bord</a>
+    <a data-t="services"><i class="fa-solid fa-list"></i> Mes prestations</a>
+    <a data-t="rdv"><i class="fa-regular fa-calendar-check"></i> Rendez-vous</a>
+    <a data-t="profile"><i class="fa-regular fa-user"></i> Ma vitrine</a>
+    <a href="messages.html"><i class="fa-regular fa-comment"></i> Messages</a>
+  </aside>
+  <main id="main"></main>
+</div>
+<div id="footer"></div><div id="mnav"></div>
+<script src="assets/app.js"></script>
+<script>
+const u=requireAuth('PRO');
+if(u){
+ let me=apiSync('/providers/me/profile');
+ const tabs=[...document.querySelectorAll('.sidebar a[data-t]')];
+ tabs.forEach(t=>t.onclick=()=>{tabs.forEach(x=>x.classList.remove('active'));t.classList.add('active');render(t.dataset.t)});
+ const TL={GARAGE:'Entretien / Garage',PNEUMATIQUE:'Pneus',LAVAGE:'Lavage'};
+ function refresh(){me=apiSync('/providers/me/profile');}
+ function banner(){if(me.proStatus&&me.proStatus!=='Validé')return `<div class="card" style="padding:16px;background:#FFF3E0;border-color:#ffe0b2;margin-bottom:16px"><b><i class="fa-solid fa-clock" style="color:var(--amber)"></i> Compte ${me.proStatus}</b><div style="font-size:14px;color:#7a5b1a">Votre vitrine sera visible publiquement après validation par l'administration.</div></div>`;return ''}
+ function render(t){
+  const M=document.getElementById('main');const rdvs=apiSync('/appointments/pro');const arr=Array.isArray(rdvs)?rdvs:[];
+  if(t==='dash'){
+    M.innerHTML=banner()+`<h1 style="font-size:26px">Bonjour ${me.firstName} 👋</h1><p style="color:var(--muted)">${TL[me.proType]||''} • ${me.city||''}</p>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin-top:16px">
+     <div class="stat"><div class="num">${arr.length}</div><div style="color:var(--muted)">RDV reçus</div></div>
+     <div class="stat"><div class="num">${(me.services||[]).length}</div><div style="color:var(--muted)">Prestations</div></div>
+     <div class="stat"><div class="num">${me.rating||'—'} ★</div><div style="color:var(--muted)">Note</div></div>
+     <div class="stat"><div class="num">${me.jobs||0}</div><div style="color:var(--muted)">Interventions</div></div>
+    </div><h2 style="font-size:20px;margin-top:24px">Prochains rendez-vous</h2>${rdvList(arr.slice(0,5))}`;
+  } else if(t==='services'){
+    M.innerHTML=banner()+`<h1 style="font-size:26px">Mes prestations</h1>
+    <div style="margin-top:14px">${(me.services||[]).map(sv=>`<div class="card" style="padding:14px;display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><div><b>${sv.name}</b> <span style="color:var(--muted);font-size:13px">${sv.duration||''}</span></div><div style="display:flex;gap:12px;align-items:center"><b>${sv.price} €</b><button class="btn btn-ghost" style="padding:5px 10px" onclick="delSvc('${sv.name.replace(/'/g,"")}')"><i class="fa-solid fa-trash"></i></button></div></div>`).join('')||'<p style="color:var(--muted)">Aucune prestation. Ajoutez-en une ci-dessous.</p>'}</div>
+    <div class="card" style="padding:18px;margin-top:12px"><h3 style="margin-top:0">Ajouter une prestation</h3>
+     <div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:10px" class="add-grid"><input class="input" id="sn" placeholder="Nom (ex: Vidange)"><input class="input" id="sp" type="number" placeholder="Prix €"><input class="input" id="sd" placeholder="Durée (ex: 1h)"></div>
+     <button class="btn btn-red" style="margin-top:12px" onclick="addSvc()" data-testid="add-service">Ajouter</button></div>`;
+  } else if(t==='rdv'){
+    M.innerHTML=`<h1 style="font-size:26px">Rendez-vous</h1>${rdvList(arr)}`;
+  } else if(t==='profile'){
+    M.innerHTML=`<h1 style="font-size:26px">Ma vitrine</h1><div class="card" style="padding:22px;margin-top:14px;max-width:520px">
+     <label class="label">Entreprise</label><input class="input" id="pc" value="${me.company||''}">
+     <label class="label" style="margin-top:12px">Ville</label><input class="input" id="pv" value="${me.city||''}">
+     <label class="label" style="margin-top:12px">Description</label><textarea class="input" id="pd" rows="4">${me.description||''}</textarea>
+     <button class="btn btn-red" style="margin-top:14px" onclick="saveProfile()">Enregistrer</button></div>`;
+  }
+ }
+ function rdvList(arr){return arr.length?`<div style="margin-top:12px;display:grid;gap:10px">${arr.map(r=>`<div class="card" style="padding:14px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px"><div><b>${r.serviceName}</b><div style="color:var(--muted);font-size:13px">${new Date(r.date).toLocaleDateString('fr-FR')} à ${r.time} • Client : ${r.clientName} • ${r.ref}</div></div><span class="chip" style="background:#E8F5E9;color:var(--green);border:none">${r.status}</span></div>`).join('')}</div>`:`<div class="card" style="padding:40px;text-align:center;margin-top:12px;color:var(--muted)"><i class="fa-regular fa-calendar" style="font-size:32px"></i><p>Aucun rendez-vous pour l'instant.</p></div>`}
+ window.addSvc=()=>{const name=sn.value.trim();if(!name){toast('Nom requis');return}const r=apiSync('/providers/service','POST',{name,price:+sp.value||0,duration:sd.value});if(r.error){toast(r.error);return}refresh();toast('Prestation ajoutée');render('services')};
+ window.delSvc=(name)=>{const r=apiSync('/providers/service/'+encodeURIComponent(name),'DELETE');if(r.error){toast(r.error);return}refresh();toast('Prestation supprimée');render('services')};
+ window.saveProfile=()=>{const r=apiSync('/providers/profile','POST',{company:pc.value,city:pv.value,description:pd.value});if(r.error){toast(r.error);return}refresh();toast('Vitrine enregistrée')};
+ render('dash');
+}
+</script>
+<style>@media(max-width:860px){.dash-grid{grid-template-columns:1fr!important}.add-grid{grid-template-columns:1fr!important}}</style>
+</body></html>

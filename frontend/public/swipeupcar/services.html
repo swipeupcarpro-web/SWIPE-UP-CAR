@@ -1,24 +1,33 @@
 <!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Services automobiles — Bientôt disponibles | SWIPEUPCAR</title><meta name="description" content="Entretien, pneus, pièces auto et lavage : bientôt disponibles sur SWIPEUPCAR.">
+<title>Services automobiles — Prendre RDV | SWIPEUPCAR</title>
+<meta name="description" content="Prenez rendez-vous avec des professionnels vérifiés : entretien, pneus, lavage. Partout en France.">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"><link rel="stylesheet" href="assets/style.css"></head>
 <body><div id="nav"></div>
-<div class="container" style="padding:50px 20px;max-width:760px;text-align:center" id="page"></div>
+<div class="container" style="padding:26px 20px" id="page"></div>
 <div id="footer"></div><div id="mnav"></div>
 <script src="assets/app.js"></script>
 <script>
-const svc={entretien:['🔧','Entretien automobile','Vidange, révision, freins... Réservez un créneau chez un garage vérifié.'],pneus:['🛞','Pneus','Achat et montage de pneus près de chez vous.'],pieces:['🧩','Pièces auto','Trouvez et commandez des pièces détachées de confiance.'],lavage:['🧽','Lavage / detailing','Nettoyage intérieur et extérieur, detailing premium.']};
-const s=new URLSearchParams(location.search).get('s');const data=svc[s];
-document.getElementById('page').innerHTML=`
-${data?`<div style="font-size:56px">${data[0]}</div><h1 style="font-size:34px;margin:10px 0 6px">${data[1]}</h1><p style="color:var(--muted);font-size:18px">${data[2]}</p>`:`<h1 style="font-size:34px">Nos futurs services</h1><p style="color:var(--muted);font-size:18px">SWIPEUPCAR devient la plateforme automobile complète.</p>`}
-<div class="chip" style="background:#FFF3E0;color:var(--amber);border:none;margin-top:16px;font-size:15px"><i class="fa-solid fa-clock"></i> Service bientôt disponible</div>
-<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin:34px 0">
- ${Object.entries(svc).map(([k,v])=>`<a href="services.html?s=${k}" class="card" style="padding:20px;display:block;${k===s?'border-color:var(--red)':''}"><div style="font-size:30px">${v[0]}</div><b style="display:block;margin-top:8px">${v[1]}</b></a>`).join('')}
-</div>
-<div class="card" style="padding:26px;text-align:left">
- <h3 style="margin-top:0">Soyez informé du lancement</h3>
- <form id="notif" style="display:flex;gap:10px;flex-wrap:wrap"><input class="input" type="email" placeholder="Votre email" required style="flex:1;min-width:220px"><button class="btn btn-red">Me prévenir</button></form>
- <p style="color:var(--muted);font-size:13px;margin-top:10px">En attendant, la <a href="location.html" style="color:var(--red);font-weight:700">location de véhicules</a> est déjà 100% opérationnelle.</p>
-</div>`;
-document.getElementById('notif').onsubmit=e=>{e.preventDefault();e.target.reset();toast('Merci ! Nous vous préviendrons du lancement.')};
+const MAP={entretien:'GARAGE',pneus:'PNEUMATIQUE',lavage:'LAVAGE'};
+const META={GARAGE:['🔧','Entretien automobile','Vidange, révision, freins — chez un garage vérifié.'],PNEUMATIQUE:['🛞','Pneus','Montage, équilibrage et géométrie près de chez vous.'],LAVAGE:['🧽','Lavage / detailing','Nettoyage intérieur et extérieur, detailing premium.']};
+const s=new URLSearchParams(location.search).get('s')||'entretien';
+if(s==='pieces'){ // pièces : pas de RDV pour l'instant
+  document.getElementById('page').innerHTML=`<div style="text-align:center;padding:40px 0"><div style="font-size:52px">🧩</div><h1 style="font-size:32px;margin:8px 0">Pièces auto</h1><p style="color:var(--muted);font-size:18px">La vente de pièces (avec commande) arrivera prochainement.</p><div class="chip" style="background:#FFF3E0;color:var(--amber);border:none;margin-top:12px"><i class="fa-solid fa-clock"></i> Bientôt disponible</div><div style="margin-top:20px"><a href="services.html?s=entretien" class="btn btn-red">Voir les services sur RDV</a></div></div>`;
+}else{
+  const type=MAP[s]; const m=META[type];
+  const list=apiSync('/providers?type='+type); const arr=Array.isArray(list)?list:[];
+  const tabs=Object.entries(MAP).map(([k,v])=>`<a href="services.html?s=${k}" class="chip" style="${k===s?'background:var(--red);color:#fff;border:none':''}">${META[v][0]} ${META[v][1]}</a>`).join(' ');
+  document.getElementById('page').innerHTML=`
+   <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">${tabs}</div>
+   <div style="font-size:48px">${m[0]}</div><h1 style="font-size:30px;margin:4px 0">${m[1]}</h1><p style="color:var(--muted);font-size:17px">${m[2]} <b>Prise de RDV en ligne, sans paiement.</b></p>
+   <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:18px;margin-top:20px">
+   ${arr.length?arr.map(p=>`<div class="card fade-up" style="padding:18px">
+      <div style="display:flex;justify-content:space-between;align-items:start"><div><div style="font-family:'Fraunces',serif;font-weight:600;font-size:19px">${p.company||p.firstName}</div><div style="color:var(--muted);font-size:13px"><i class="fa-solid fa-location-dot"></i> ${p.city} ${p.verified?'• <span style="color:var(--green)"><i class="fa-solid fa-circle-check"></i> Vérifié</span>':''}</div></div><span style="font-weight:700"><i class="fa-solid fa-star" style="color:var(--amber)"></i> ${(p.rating||0).toFixed(1)}</span></div>
+      <p style="color:#40382f;font-size:14px;margin:10px 0">${p.description||''}</p>
+      <div style="font-size:13px;color:var(--muted)">${(p.services||[]).slice(0,3).map(sv=>`<div style="display:flex;justify-content:space-between;padding:3px 0;border-top:1px solid var(--line)"><span>${sv.name}</span><b style="color:var(--carbon)">${sv.price} €</b></div>`).join('')}</div>
+      <a href="service.html?id=${p.id}" class="btn btn-red" style="width:100%;margin-top:14px" data-testid="provider-${p.id}"><i class="fa-regular fa-calendar-check"></i> Prendre RDV</a>
+   </div>`).join(''):`<div class="card" style="padding:40px;text-align:center;color:var(--muted);grid-column:1/-1"><i class="fa-solid fa-store" style="font-size:34px"></i><p>Aucun professionnel dans cette catégorie pour le moment.</p><a href="devenir-partenaire.html" class="btn btn-red">Devenir partenaire</a></div>`}
+   </div>
+   <div class="card" style="margin-top:24px;padding:20px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px"><span>Vous êtes un professionnel (garage, pneus, lavage) ?</span><a href="devenir-partenaire.html" class="btn btn-dark">Devenir partenaire</a></div>`;
+}
 </script></body></html>

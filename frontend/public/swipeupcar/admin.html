@@ -8,8 +8,10 @@
     <a data-t="dash" class="active"><i class="fa-solid fa-gauge"></i> Dashboard</a>
     <a data-t="users"><i class="fa-solid fa-users"></i> Utilisateurs</a>
     <a data-t="owners"><i class="fa-solid fa-briefcase"></i> Loueurs</a>
+    <a data-t="providers"><i class="fa-solid fa-screwdriver-wrench"></i> Prestataires</a>
     <a data-t="vehicles"><i class="fa-solid fa-car"></i> Véhicules</a>
     <a data-t="bookings"><i class="fa-solid fa-calendar-check"></i> Réservations</a>
+    <a data-t="rdv"><i class="fa-regular fa-calendar-check"></i> Rendez-vous</a>
     <a data-t="commissions"><i class="fa-solid fa-percent"></i> Commissions</a>
     <a data-t="settings"><i class="fa-solid fa-gear"></i> Paramètres</a>
   </aside>
@@ -44,6 +46,12 @@ if(u){
   } else if(t==='owners'){
     const os=db.users.filter(x=>x.role==='LOUEUR');
     M.innerHTML=head('Loueurs')+tbl(['Entreprise','Email','SIRET','Statut','Actions'],os.map(x=>[x.company||x.firstName,x.email,x.siret||'—',chip(x.proStatus||'Validé'),`${x.proStatus!=='Validé'?`<button class="btn btn-red" style="padding:5px 10px;font-size:13px" onclick="valid('${x.id}')">Valider</button> `:''}<button class="btn btn-ghost" style="padding:5px 10px;font-size:13px" onclick="refuseO('${x.id}')">Refuser</button>`]));
+  } else if(t==='providers'){
+    const ps=(STATE.admin&&STATE.admin.providers)||[];
+    M.innerHTML=head('Prestataires (services / RDV)')+tbl(['Entreprise','Type','Ville','Prestations','Statut','Actions'],ps.map(x=>[x.company||x.firstName,x.proType,x.city||'—',(x.services||[]).length,chip(x.proStatus||'Validé'),`${x.proStatus!=='Validé'?`<button class="btn btn-red" style="padding:5px 10px;font-size:13px" onclick="valid('${x.id}')">Valider</button> `:''}<button class="btn btn-ghost" style="padding:5px 10px;font-size:13px" onclick="refuseO('${x.id}')">Refuser</button>`]));
+  } else if(t==='rdv'){
+    const ap=(STATE.admin&&STATE.admin.appointments)||[];
+    M.innerHTML=head('Rendez-vous (services)')+tbl(['Réf','Type','Prestation','Prestataire','Client','Date','Statut'],ap.map(a=>[a.ref,a.proType,a.serviceName,a.providerName,a.clientName,new Date(a.date).toLocaleDateString('fr-FR')+' '+a.time,chip(a.status)]));
   } else if(t==='vehicles'){
     M.innerHTML=head('Véhicules')+tbl(['Véhicule','Loueur','Prix','Statut','Actions'],db.vehicles.map(v=>{const o=db.users.find(x=>x.id===v.owner);return[`${v.brand} ${v.model}`,o?o.firstName:'—',v.price+' €',chip(v.status),`${v.status!=='approved'?`<button class="btn btn-red" style="padding:5px 10px;font-size:13px" onclick="approveV('${v.id}')">Approuver</button> `:''}<button class="btn btn-ghost" style="padding:5px 10px;font-size:13px" onclick="rejectV('${v.id}')">Refuser</button>`]}));
   } else if(t==='bookings'){

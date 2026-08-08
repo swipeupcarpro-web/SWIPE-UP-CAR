@@ -7,6 +7,7 @@
   <aside class="sidebar card hide-mobile" style="padding:14px;height:fit-content;position:sticky;top:80px">
     <a data-t="dash" class="active"><i class="fa-solid fa-gauge"></i> Tableau de bord</a>
     <a data-t="book"><i class="fa-solid fa-calendar-check"></i> Mes réservations</a>
+    <a data-t="rdv"><i class="fa-regular fa-calendar-check"></i> Mes rendez-vous</a>
     <a data-t="fav" id="fav"><i class="fa-regular fa-heart"></i> Mes favoris</a>
     <a href="messages.html"><i class="fa-regular fa-comment"></i> Mes messages</a>
     <a data-t="reviews"><i class="fa-regular fa-star"></i> Mes avis</a>
@@ -43,6 +44,9 @@ if(u){
   } else if(t==='reviews'){
     const done=myBookings().filter(b=>b.to<todayISO());const revs=db.reviews.filter(r=>r.userId===u.id);
     M.innerHTML=`<h1 style="font-size:26px">Mes avis</h1><p style="color:var(--muted)">Notez vos locations passées.</p>${done.length?done.map(b=>{const v=db.vehicles.find(x=>x.id===b.vehicleId);const has=revs.find(r=>r.bookingId===b.id);return `<div class="card" style="padding:16px;margin-top:12px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><div><b>${v.brand} ${v.model}</b><div style="color:var(--muted);font-size:13px">${b.ref}</div></div>${has?`<span>${'★'.repeat(has.rating)}</span>`:`<button class="btn btn-red" onclick="leaveReview('${b.id}','${v.id}')">Laisser un avis</button>`}</div>`}).join(''):empty('Aucune location terminée','Vos avis seront possibles après vos locations.','location.html','Réserver')}`;
+  } else if(t==='rdv'){
+    const rdvs=apiSync('/appointments/mine');const arr=Array.isArray(rdvs)?rdvs:[];
+    M.innerHTML=`<h1 style="font-size:26px">Mes rendez-vous</h1>${arr.length?`<div style="margin-top:14px;display:grid;gap:10px">${arr.map(r=>`<div class="card" style="padding:16px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px"><div><b>${r.serviceName}</b><div style="color:var(--muted);font-size:13px">${r.providerName} • ${new Date(r.date).toLocaleDateString('fr-FR')} à ${r.time} • ${r.ref}</div></div><span class="chip" style="background:#E8F5E9;color:var(--green);border:none">${r.status}</span></div>`).join('')}</div>`:empty('Aucun rendez-vous','Prenez RDV pour l\'entretien, les pneus ou le lavage.','services.html?s=entretien','Prendre RDV')}`;
   } else if(t==='profile'){
     M.innerHTML=`<h1 style="font-size:26px">Mon profil</h1><div class="card" style="padding:22px;margin-top:14px;max-width:480px">
      <label class="label">Prénom</label><input class="input" id="pf" value="${u.firstName}">
@@ -57,7 +61,10 @@ if(u){
  function empty(t,d,link,cta){return `<div class="card" style="padding:50px 20px;text-align:center;margin-top:16px"><i class="fa-solid fa-inbox" style="font-size:38px;color:var(--muted)"></i><h3 style="margin:14px 0 6px">${t}</h3><p style="color:var(--muted)">${d}</p><a href="${link}" class="btn btn-red" style="margin-top:12px">${cta}</a></div>`}
  window.saveProfile=()=>{const db=DB.get();const usr=db.users.find(x=>x.id===u.id);usr.firstName=pf.value;usr.lastName=pl.value;usr.phone=pp.value;DB.set(db);toast('Profil enregistré');renderNav()};
  window.leaveReview=(bid,vid)=>{const r=prompt('Note de 1 à 5 :','5');const n=Math.max(1,Math.min(5,+r||5));const db=DB.get();db.reviews.push({id:uid('R'),bookingId:bid,vehicleId:vid,userId:u.id,rating:n,text:'Très bonne expérience',date:new Date().toISOString()});DB.set(db);toast('Merci pour votre avis !');render('reviews')};
- render(new URLSearchParams(location.search).has('fav')?(document.querySelector('[data-t=fav]').click(),'fav'):'dash');
+ const _h=(location.hash||'').replace('#','');
+ if(_h==='rdv'){document.querySelector('[data-t=rdv]').click();}
+ else if(_h==='fav'){document.querySelector('[data-t=fav]').click();}
+ else render('dash');
 }
 </script>
 <style>@media(max-width:860px){.dash-grid{grid-template-columns:1fr!important}}</style>

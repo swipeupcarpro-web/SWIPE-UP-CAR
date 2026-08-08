@@ -80,6 +80,14 @@ class RegisterIn(BaseModel):
     firstName: str; lastName: str = ""; email: EmailStr; password: str
     phone: str = ""; role: str = "PARTICULIER"
     company: Optional[str] = None; siret: Optional[str] = None; iban: Optional[str] = None
+    proType: Optional[str] = None; city: Optional[str] = None
+SERVICE_TYPES = {"GARAGE", "PNEUMATIQUE", "LAVAGE"}
+class ServiceIn(BaseModel):
+    name: str; price: float = 0; duration: str = ""
+class ProfileIn(BaseModel):
+    city: str = ""; description: str = ""; company: str = ""
+class ApptIn(BaseModel):
+    providerId: str; serviceName: str; price: float = 0; date: str; time: str
 class LoginIn(BaseModel):
     email: EmailStr; password: str
 class VehicleIn(BaseModel):
@@ -98,7 +106,7 @@ async def register(data: RegisterIn):
     email = data.email.lower()
     if await db.users.find_one({"email": email}):
         raise HTTPException(400, "Cet email est déjà utilisé.")
-    role = data.role if data.role in ("PARTICULIER", "LOUEUR") else "PARTICULIER"
+    role = data.role if data.role in ("PARTICULIER", "LOUEUR", "PRO") else "PARTICULIER"
     doc = {"firstName": data.firstName, "lastName": data.lastName, "email": email,
            "password_hash": hash_pw(data.password), "phone": data.phone, "role": role,
            "verified": False, "created_at": datetime.now(timezone.utc).isoformat()}
@@ -106,14 +114,20 @@ async def register(data: RegisterIn):
         doc.update({"company": data.company, "siret": data.siret, "iban": data.iban,
                     "proStatus": "En vérification", "rating": 0, "rentals": 0,
                     "since": str(datetime.now().year), "satisfaction": 0})
+    if role == "PRO":
+        pt = data.proType if data.proType in SERVICE_TYPES else "LAVAGE"
+        doc.update({"company": data.company, "siret": data.siret, "proType": pt,
+                    "city": data.city or "", "lat": 46.6, "lng": 2.2, "description": "",
+                    "proStatus": "En vérification", "rating": 0, "jobs": 0,
+                    "since": str(datetime.now().year), "services": []})
     res = await db.users.insert_one(doc)
     doc["_id"] = res.inserted_id
     await send_email(email, "Bienvenue sur SWIPEUPCAR",
         mail_tpl("Compte créé 🎉", f"Bonjour {data.firstName}, votre compte SWIPEUPCAR est actif." + (
-            " Votre dossier professionnel est en cours de vérification par notre équipe." if role=="LOUEUR" else "")))
-    if role == "LOUEUR":
+            " Votre dossier professionnel est en cours de vérification par notre équipe." if role in ("LOUEUR","PRO") else "")))
+    if role in ("LOUEUR", "PRO"):
         admin = await db.users.find_one({"role": "ADMIN"})
-        if admin: await send_email(admin["email"], "Nouveau loueur à valider", mail_tpl("Loueur en attente", f"{data.company or data.firstName} vient de s'inscrire."))
+        if admin: await send_email(admin["email"], "Nouveau professionnel à valider", mail_tpl("Pro en attente", f"{data.company or data.firstName} ({role}) vient de s'inscrire."))
     return {"token": make_token(str(res.inserted_id)), "user": clean_user(doc)}
 
 @api.post("/auth/login")
@@ -222,6 +236,79 @@ async def owner_bookings(u=Depends(current_user)):
     for r in rows: r["id"] = str(r.pop("_id"))
     return rows
 
+# ---------- providers (services: garage/pneus/lavage) - RDV only ----------
+def provider_pub(u):
+    return {"id": str(u["_id"]), "firstName": u.get("firstName"), "company": u.get("company"),
+            "proType": u.get("proType"), "city": u.get("city",""), "lat": u.get("lat",46.6), "lng": u.get("lng",2.2),
+            "description": u.get("description",""), "services": u.get("services",[]),
+            "verified": u.get("verified",False), "rating": u.get("rating",0), "jobs": u.get("jobs",0), "since": u.get("since","2026")}
+
+@api.get("/providers")
+async def list_providers(type: str):
+    us = await db.users.find({"role":"PRO","proType":type,"proStatus":"Validé"}).to_list(300)
+    return [provider_pub(u) for u in us]
+
+@api.get("/providers/{pid}")
+async def get_provider(pid: str):
+    u = await db.users.find_one({"_id": oid(pid), "role":"PRO"})
+    if not u: raise HTTPException(404, "Professionnel introuvable")
+    return provider_pub(u)
+
+@api.get("/providers/me/profile")
+async def my_provider(u=Depends(current_user)):
+    if u["role"] != "PRO": raise HTTPException(403)
+    return clean_user(u)
+
+@api.post("/providers/service")
+async def add_service(data: ServiceIn, u=Depends(current_user)):
+    if u["role"] != "PRO": raise HTTPException(403)
+    await db.users.update_one({"_id": u["_id"]}, {"$push": {"services": data.model_dump()}})
+    return {"ok": True}
+
+@api.delete("/providers/service/{name}")
+async def del_service(name: str, u=Depends(current_user)):
+    if u["role"] != "PRO": raise HTTPException(403)
+    await db.users.update_one({"_id": u["_id"]}, {"$pull": {"services": {"name": name}}})
+    return {"ok": True}
+
+@api.post("/providers/profile")
+async def update_profile(data: ProfileIn, u=Depends(current_user)):
+    if u["role"] != "PRO": raise HTTPException(403)
+    upd = {k: v for k, v in data.model_dump().items() if v}
+    await db.users.update_one({"_id": u["_id"]}, {"$set": upd})
+    return {"ok": True}
+
+# ---------- appointments (RDV, sans paiement) ----------
+@api.post("/appointments")
+async def create_appt(data: ApptIn, u=Depends(current_user)):
+    p = await db.users.find_one({"_id": oid(data.providerId), "role":"PRO"})
+    if not p or p.get("proStatus") != "Validé": raise HTTPException(400, "Professionnel indisponible.")
+    ref = "RDV-" + os.urandom(3).hex().upper()
+    doc = {"ref": ref, "userId": str(u["_id"]), "providerId": data.providerId, "proType": p.get("proType"),
+           "serviceName": data.serviceName, "price": data.price, "date": data.date, "time": data.time,
+           "status": "confirmé", "clientName": u["firstName"], "providerName": p.get("company") or p.get("firstName"),
+           "createdAt": datetime.now(timezone.utc).isoformat()}
+    res = await db.appointments.insert_one(doc)
+    await db.users.update_one({"_id": p["_id"]}, {"$inc": {"jobs": 1}})
+    await send_email(u["email"], f"Rendez-vous confirmé — {ref}",
+        mail_tpl("Rendez-vous confirmé ✅", f"Votre RDV « {data.serviceName} » chez <b>{doc['providerName']}</b> le {data.date} à {data.time} est confirmé.<br>Référence : <b>{ref}</b>"))
+    await send_email(p["email"], f"Nouveau rendez-vous — {ref}",
+        mail_tpl("Nouveau rendez-vous 📅", f"Nouveau RDV « {data.serviceName} » le {data.date} à {data.time} (client : {u['firstName']}).<br>Référence : {ref}"))
+    doc["id"] = str(res.inserted_id); doc.pop("_id", None)
+    return doc
+
+@api.get("/appointments/mine")
+async def my_appts(u=Depends(current_user)):
+    rows = await db.appointments.find({"userId": str(u["_id"])}).sort("createdAt", -1).to_list(500)
+    for r in rows: r["id"] = str(r.pop("_id"))
+    return rows
+
+@api.get("/appointments/pro")
+async def pro_appts(u=Depends(current_user)):
+    rows = await db.appointments.find({"providerId": str(u["_id"])}).sort("createdAt", -1).to_list(500)
+    for r in rows: r["id"] = str(r.pop("_id"))
+    return rows
+
 # ---------- admin ----------
 async def require_admin(u=Depends(current_user)):
     if u["role"] != "ADMIN": raise HTTPException(403, "Réservé à l'administration")
@@ -233,15 +320,19 @@ async def admin_overview(u=Depends(require_admin)):
     users = await db.users.find().to_list(1000)
     vehicles = await db.vehicles.find().to_list(1000)
     for b in bookings: b["id"] = str(b.pop("_id"))
+    appts = await db.appointments.find().sort("createdAt", -1).to_list(1000)
+    for a in appts: a["id"] = str(a.pop("_id"))
     return {
         "ca": sum(b["total"] for b in bookings),
         "commission": sum(b["commission"] for b in bookings),
         "bookings": bookings,
+        "appointments": appts,
         "owners": [clean_user(x) for x in users if x["role"] == "LOUEUR"],
+        "providers": [provider_pub(x) for x in users if x["role"] == "PRO"],
         "clients": [clean_user(x) for x in users if x["role"] == "PARTICULIER"],
         "vehicles": [await vehicle_out(v) for v in vehicles],
         "pendingVehicles": sum(1 for v in vehicles if v["status"] == "pending"),
-        "pendingOwners": sum(1 for x in users if x["role"] == "LOUEUR" and x.get("proStatus") not in (None, "Validé")),
+        "pendingOwners": sum(1 for x in users if x["role"] in ("LOUEUR","PRO") and x.get("proStatus") not in (None, "Validé")),
     }
 
 @api.post("/admin/owners/{uid}/{action}")
@@ -311,6 +402,14 @@ async def startup():
           {"owner":l2,"brand":"Fiat","model":"500","year":2022,"cat":"Citadine","km":22000,"power":70,"fuel":"Essence","gear":"Manuelle","seats":4,"doors":3,"color":"Rouge","price":34,"priceWe":60,"priceWeek":200,"city":"Nantes","dept":"44","lat":47.2184,"lng":-1.5536,"rating":4.6,"reviews":37,"status":"approved","deposit":500,"minAge":19,"mileageInc":250,"features":["Climatisation","CarPlay"],"images":[IMG["orange"]],"desc":"Petite citadine iconique et fun."},
         ]
         await db.vehicles.insert_many(seed)
+    # demo service providers (RDV)
+    async def ensure_pro(email, pw, doc):
+        if await db.users.find_one({"email": email}): return
+        doc["email"]=email; doc["password_hash"]=hash_pw(pw); doc["role"]="PRO"; doc["verified"]=True; doc["proStatus"]="Validé"
+        await db.users.insert_one(doc)
+    await ensure_pro("garage@swipeupcar.fr","pro123",{"firstName":"Karim","company":"Garage Central Auto","proType":"GARAGE","city":"Paris","lat":48.8566,"lng":2.3522,"description":"Entretien toutes marques, mécanique et révisions.","rating":4.8,"jobs":230,"since":"2022","services":[{"name":"Vidange + filtres","price":89,"duration":"1h"},{"name":"Révision complète","price":190,"duration":"2h"},{"name":"Plaquettes de frein","price":150,"duration":"1h30"}]})
+    await ensure_pro("pneus@swipeupcar.fr","pro123",{"firstName":"Léa","company":"SpeedPneus Lyon","proType":"PNEUMATIQUE","city":"Lyon","lat":45.764,"lng":4.8357,"description":"Montage, équilibrage et géométrie.","rating":4.7,"jobs":180,"since":"2023","services":[{"name":"Montage 2 pneus","price":40,"duration":"45min"},{"name":"Montage 4 pneus","price":70,"duration":"1h"},{"name":"Géométrie","price":60,"duration":"45min"}]})
+    await ensure_pro("lavage@swipeupcar.fr","pro123",{"firstName":"Hugo","company":"BullePro Detailing","proType":"LAVAGE","city":"Bordeaux","lat":44.8378,"lng":-0.5792,"description":"Lavage premium et detailing intérieur/extérieur.","rating":4.9,"jobs":310,"since":"2021","services":[{"name":"Lavage extérieur","price":25,"duration":"30min"},{"name":"Complet int/ext","price":59,"duration":"1h30"},{"name":"Detailing premium","price":149,"duration":"4h"}]})
     logger.info("Seed complete")
 
 app.include_router(api)
