@@ -47,6 +47,9 @@ if(u){
      <label class="label">Entreprise</label><input class="input" id="pc" value="${me.company||''}">
      <label class="label" style="margin-top:12px">Ville</label><input class="input" id="pv" value="${me.city||''}">
      <label class="label" style="margin-top:12px">Description</label><textarea class="input" id="pd" rows="4">${me.description||''}</textarea>
+     <div style="display:flex;gap:12px;margin-top:12px"><div style="flex:1"><label class="label">Ouverture (h)</label><input class="input" id="poh" type="number" min="0" max="23" value="${me.openHour!=null?me.openHour:8}"></div><div style="flex:1"><label class="label">Fermeture (h)</label><input class="input" id="pch" type="number" min="1" max="24" value="${me.closeHour!=null?me.closeHour:18}"></div></div>
+     <label class="label" style="margin-top:12px">Jours de fermeture</label>
+     <div style="display:flex;gap:10px;flex-wrap:wrap">${['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'].map((d,i)=>`<label style="display:flex;gap:5px;font-size:14px"><input type="checkbox" class="cd" value="${i}" ${(me.closedDays||[]).includes(i)?'checked':''}> ${d}</label>`).join('')}</div>
      <button class="btn btn-red" style="margin-top:14px" onclick="saveProfile()">Enregistrer</button></div>`;
   }
  }
@@ -56,7 +59,7 @@ if(u){
  window.refuseRdv=(aid)=>{const r=apiSync('/appointments/'+aid+'/refuse','POST');if(r.error){toast(r.error);return}toast('RDV refusé');render('rdv')};
  window.addSvc=()=>{const name=sn.value.trim();if(!name){toast('Nom requis');return}const r=apiSync('/providers/service','POST',{name,price:+sp.value||0,duration:sd.value});if(r.error){toast(r.error);return}refresh();toast('Prestation ajoutée');render('services')};
  window.delSvc=(name)=>{const r=apiSync('/providers/service/'+encodeURIComponent(name),'DELETE');if(r.error){toast(r.error);return}refresh();toast('Prestation supprimée');render('services')};
- window.saveProfile=()=>{const r=apiSync('/providers/profile','POST',{company:pc.value,city:pv.value,description:pd.value});if(r.error){toast(r.error);return}refresh();toast('Vitrine enregistrée')};
+ window.saveProfile=()=>{const cd=[...document.querySelectorAll('.cd:checked')].map(x=>+x.value);const r=apiSync('/providers/profile','POST',{company:pc.value,city:pv.value,description:pd.value,openHour:+poh.value,closeHour:+pch.value,closedDays:cd});if(r.error){toast(r.error);return}refresh();toast('Vitrine enregistrée')};
  render('dash');
 }
 </script>

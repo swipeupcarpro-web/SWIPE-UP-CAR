@@ -42,7 +42,7 @@ document.getElementById('book').onclick=()=>{
   if(r.error){toast(r.error);b.disabled=false;b.innerHTML='<i class="fa-regular fa-calendar-check"></i> Demander le RDV';refreshSlots();return;}
   toast('Demande envoyée ! Réf '+r.ref);setTimeout(()=>location.href='compte.html#rdv',1000);
 };
-function refreshSlots(){const d=document.getElementById('d').value;const av=apiSync('/providers/'+id+'/availability?date='+d);const taken=(av&&av.taken)||[];const sel=document.getElementById('h');[...sel.options].forEach(o=>{o.disabled=taken.includes(o.value);o.textContent=o.value+(taken.includes(o.value)?' — indisponible':'');});const first=[...sel.options].find(o=>!o.disabled);if(first)sel.value=first.value;}
+function refreshSlots(){const d=document.getElementById('d').value;const av=apiSync('/providers/'+id+'/availability?date='+d);const slots=(av&&av.slots)||[];const taken=(av&&av.taken)||[];const sel=document.getElementById('h');const btn=document.getElementById('book');if(av&&av.closed){sel.innerHTML='<option>Fermé ce jour</option>';btn.disabled=true;btn.style.opacity=.5;return}btn.disabled=false;btn.style.opacity=1;sel.innerHTML=slots.map(s=>`<option value="${s}" ${taken.includes(s)?'disabled':''}>${s}${taken.includes(s)?' — indisponible':''}</option>`).join('')||'<option>Aucun créneau</option>';const first=slots.find(s=>!taken.includes(s));if(first)sel.value=first;}
 document.getElementById('d').addEventListener('change',refreshSlots);refreshSlots();
 }
 </script>

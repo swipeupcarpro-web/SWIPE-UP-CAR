@@ -19,13 +19,11 @@ document.getElementById('page').innerHTML=`
  <div class="card" style="padding:22px">
   <h3 style="margin-top:0">Paiement sécurisé</h3>
   <div class="chip" style="background:#fff"><i class="fa-brands fa-cc-stripe" style="color:#635bff"></i> Traité via Stripe Connect (mode test)</div>
-  <p style="color:var(--muted);font-size:13px;margin-top:8px">En production, le paiement passe par Stripe Connect : le client paie SWIPEUPCAR, la commission de 5 % est prélevée automatiquement et le reste est reversé au loueur. <b>Ceci est une démo — aucun débit réel.</b></p>
+  <p style="color:var(--muted);font-size:13px;margin-top:8px">Paiement réel via <b>Stripe Connect</b> (mode test) : le client paie, SWIPEUPCAR prélève 5% et reverse automatiquement le reste au loueur connecté.</p>
   <form id="payForm" style="margin-top:16px">
-    <label class="label">Titulaire de la carte</label><input class="input" required value="${u.firstName} ${u.lastName||''}" data-testid="pay-name">
-    <label class="label" style="margin-top:12px">Numéro de carte</label><input class="input" required inputmode="numeric" placeholder="4242 4242 4242 4242" maxlength="19" id="cardNo" data-testid="pay-card">
-    <div style="display:flex;gap:12px;margin-top:12px"><div style="flex:1"><label class="label">Expiration</label><input class="input" required placeholder="12/28" maxlength="5" data-testid="pay-exp"></div><div style="flex:1"><label class="label">CVC</label><input class="input" required inputmode="numeric" placeholder="123" maxlength="4" data-testid="pay-cvc"></div></div>
-    <button class="btn btn-red" style="width:100%;margin-top:20px" id="payBtn" data-testid="pay-submit"><i class="fa-solid fa-lock"></i> Payer ${money(tot)}</button>
-    <p style="color:var(--muted);font-size:12px;text-align:center;margin-top:10px">Carte test : 4242 4242 4242 4242</p>
+    <div style="display:flex;align-items:center;gap:10px;padding:14px;border:1px solid var(--line);border-radius:12px;background:#fff"><i class="fa-brands fa-cc-stripe" style="color:#635bff;font-size:26px"></i><div style="font-size:14px">Vous allez être redirigé vers <b>Stripe</b> pour un paiement 100% sécurisé.</div></div>
+    <button class="btn btn-red" style="width:100%;margin-top:16px" id="payBtn" data-testid="pay-submit"><i class="fa-solid fa-lock"></i> Payer ${money(tot)} via Stripe</button>
+    <p style="color:var(--muted);font-size:12px;text-align:center;margin-top:10px">Mode test — carte : 4242 4242 4242 4242, date future, CVC quelconque.</p>
   </form>
  </div>
  <div><div class="card" style="padding:20px;position:sticky;top:80px">
@@ -41,9 +39,10 @@ document.getElementById('page').innerHTML=`
    </div>
  </div></div>
 </div>`;
-document.getElementById('cardNo').oninput=e=>{e.target.value=e.target.value.replace(/\D/g,'').replace(/(.{4})/g,'$1 ').trim()};
-document.getElementById('payForm').onsubmit=e=>{e.preventDefault();const b=document.getElementById('payBtn');b.disabled=true;b.innerHTML='<i class="fa-solid fa-spinner fa-spin"></i> Traitement du paiement...';
- setTimeout(()=>{const r=createBooking({vehicleId:v.id,from,to});if(r.err){toast(r.err);b.disabled=false;b.innerHTML='Réessayer';return}location.href='confirmation.html?ref='+r.booking.ref},1300);
+document.getElementById('payForm').onsubmit=e=>{e.preventDefault();const b=document.getElementById('payBtn');b.disabled=true;b.innerHTML='<i class="fa-solid fa-spinner fa-spin"></i> Redirection vers le paiement…';
+ const r=apiSync('/payments/checkout/booking','POST',{vehicleId:v.id,frm:from,to,origin_url:window.location.origin});
+ if(r.error){toast(r.error);b.disabled=false;b.innerHTML='Réessayer';return}
+ window.location=r.checkout_url;
 };
 }
 </script>

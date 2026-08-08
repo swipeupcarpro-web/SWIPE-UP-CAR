@@ -9,7 +9,7 @@ from fastapi import FastAPI, APIRouter, HTTPException, Request, Depends, UploadF
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 from bson import ObjectId
-import requests as _rq, uuid
+import requests as _rq, uuid, stripe
 from pydantic import BaseModel, EmailStr
 from typing import Optional, List
 
@@ -27,6 +27,8 @@ EMAIL_FROM_NAME = os.environ.get("EMAIL_FROM_NAME", "SWIPEUPCAR")
 COMMISSION = 0.05
 
 app = FastAPI()
+stripe.api_key = os.environ.get("STRIPE_SECRET_KEY") or "sk_test_emergent"
+STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
 api = APIRouter(prefix="/api")
 
 # ---------- helpers ----------
@@ -107,6 +109,7 @@ class ServiceIn(BaseModel):
     name: str; price: float = 0; duration: str = ""
 class ProfileIn(BaseModel):
     city: str = ""; description: str = ""; company: str = ""
+    openHour: Optional[int] = None; closeHour: Optional[int] = None; closedDays: Optional[List[int]] = None
 class ApptIn(BaseModel):
     providerId: str; serviceName: str; price: float = 0; date: str; time: str
 class LoginIn(BaseModel):
@@ -310,7 +313,7 @@ async def del_service(name: str, u=Depends(current_user)):
 @api.post("/providers/profile")
 async def update_profile(data: ProfileIn, u=Depends(current_user)):
     if u["role"] != "PRO": raise HTTPException(403)
-    upd = {k: v for k, v in data.model_dump().items() if v}
+    upd = {k: v for k, v in data.model_dump().items() if v is not None and v != ""}
     await db.users.update_one({"_id": u["_id"]}, {"$set": upd})
     return {"ok": True}
 
@@ -336,8 +339,16 @@ async def create_appt(data: ApptIn, u=Depends(current_user)):
 
 @api.get("/providers/{pid}/availability")
 async def availability(pid: str, date: str):
+    p = await db.users.find_one({"_id": oid(pid)})
+    oh = int((p or {}).get("openHour") or 8); ch = int((p or {}).get("closeHour") or 18)
+    closed = (p or {}).get("closedDays") or []
+    import datetime as _dt
+    try: wd = _dt.date.fromisoformat(date).weekday()
+    except Exception: wd = -1
+    day_closed = wd in closed
+    slots = [] if day_closed else [f"{h:02d}:00" for h in range(oh, ch)]
     rows = await db.appointments.find({"providerId": pid, "date": date, "status": {"$in": ["En attente","confirmé"]}}).to_list(200)
-    return {"taken": [r["time"] for r in rows]}
+    return {"slots": slots, "taken": [r["time"] for r in rows], "closed": day_closed}
 
 @api.post("/appointments/{aid}/{action}")
 async def appt_action(aid: str, action: str, u=Depends(current_user)):
@@ -365,6 +376,132 @@ async def pro_appts(u=Depends(current_user)):
     rows = await db.appointments.find({"providerId": str(u["_id"])}).sort("createdAt", -1).to_list(500)
     for r in rows: r["id"] = str(r.pop("_id"))
     return rows
+
+# ---------- Stripe (paiements marketplace + Connect) ----------
+class OnboardIn(BaseModel):
+    origin_url: str
+class BookingCheckoutIn(BaseModel):
+    vehicleId: str; frm: str; to: str; origin_url: str
+
+@api.post("/stripe/connect/onboard")
+async def connect_onboard(data: OnboardIn, u=Depends(current_user)):
+    if u["role"] not in ("LOUEUR","ADMIN"): raise HTTPException(403, "Réservé aux loueurs")
+    acct = u.get("stripe_account_id")
+    if not acct:
+        try:
+            a = stripe.Account.create(type="express", country="FR", email=u["email"],
+                capabilities={"transfers": {"requested": True}, "card_payments": {"requested": True}})
+        except Exception:
+            raise HTTPException(400, "Stripe Connect n'est pas encore activé sur la plateforme. Activez « Connect » dans votre dashboard Stripe (Réglages → Connect) pour permettre les reversements automatiques de 95% aux loueurs. Le paiement des locations fonctionne déjà.")
+        acct = a.id
+        await db.users.update_one({"_id": u["_id"]}, {"$set": {"stripe_account_id": acct}})
+    link = stripe.AccountLink.create(account=acct,
+        refresh_url=data.origin_url + "/swipeupcar/loueur.html",
+        return_url=data.origin_url + "/swipeupcar/loueur.html?connected=1",
+        type="account_onboarding")
+    return {"url": link.url}
+
+@api.get("/stripe/connect/status")
+async def connect_status(u=Depends(current_user)):
+    acct = u.get("stripe_account_id")
+    if not acct: return {"connected": False, "charges_enabled": False}
+    try:
+        a = stripe.Account.retrieve(acct)
+        return {"connected": True, "charges_enabled": bool(a.charges_enabled), "payouts_enabled": bool(a.payouts_enabled)}
+    except Exception:
+        return {"connected": False, "charges_enabled": False}
+
+@api.post("/payments/checkout/booking")
+async def checkout_booking(data: BookingCheckoutIn, u=Depends(current_user)):
+    v = await db.vehicles.find_one({"_id": oid(data.vehicleId)})
+    if not v or v["status"] != "approved": raise HTTPException(400, "Véhicule indisponible.")
+    clash = await db.bookings.find_one({"vehicleId": data.vehicleId, "status": "confirmed",
+        "$nor": [{"to": {"$lte": data.frm}}, {"frm": {"$gte": data.to}}]})
+    if clash: raise HTTPException(409, "Ces dates ne sont plus disponibles.")
+    days = days_between(data.frm, data.to)
+    total = round(days * v["price"]); commission = round(total * COMMISSION)
+    owner = await db.users.find_one({"_id": oid(v["owner"])})
+    pi_data = {}
+    if owner and owner.get("stripe_account_id"):
+        try:
+            acc = stripe.Account.retrieve(owner["stripe_account_id"])
+            if acc.charges_enabled:
+                pi_data = {"application_fee_amount": commission * 100, "transfer_data": {"destination": owner["stripe_account_id"]}}
+        except Exception:
+            pi_data = {}
+    kwargs = dict(mode="payment",
+        line_items=[{"price_data": {"currency": "eur", "unit_amount": total * 100,
+            "product_data": {"name": f"Location {v['brand']} {v['model']}", "description": f"{data.frm} → {data.to} ({days} j)"}}, "quantity": 1}],
+        success_url=f"{data.origin_url}/swipeupcar/payment-success.html?session_id={{CHECKOUT_SESSION_ID}}",
+        cancel_url=f"{data.origin_url}/swipeupcar/payment-cancel.html",
+        metadata={"kind": "booking", "userId": str(u["_id"]), "vehicleId": data.vehicleId})
+    if pi_data: kwargs["payment_intent_data"] = pi_data
+    session = stripe.checkout.Session.create(**kwargs)
+    await db.payment_transactions.insert_one({"session_id": session.id, "userId": str(u["_id"]),
+        "vehicleId": data.vehicleId, "frm": data.frm, "to": data.to, "total": total,
+        "commission": commission, "ownerAmount": total - commission, "ownerId": v["owner"],
+        "status": "initiated", "payment_status": "pending", "created_at": datetime.now(timezone.utc).isoformat()})
+    return {"checkout_url": session.url, "session_id": session.id}
+
+async def _finalize_booking(session_id):
+    tx = await db.payment_transactions.find_one({"session_id": session_id})
+    if not tx or tx.get("booking_ref"): return tx
+    v = await db.vehicles.find_one({"_id": oid(tx["vehicleId"])})
+    cu = await db.users.find_one({"_id": oid(tx["userId"])})
+    owner = await db.users.find_one({"_id": oid(tx["ownerId"])})
+    ref = "SUC-" + os.urandom(3).hex().upper()
+    doc = {"ref": ref, "userId": tx["userId"], "ownerId": tx["ownerId"], "vehicleId": tx["vehicleId"],
+        "frm": tx["frm"], "to": tx["to"], "days": days_between(tx["frm"], tx["to"]),
+        "total": tx["total"], "commission": tx["commission"], "ownerAmount": tx["ownerAmount"],
+        "status": "confirmed", "paid": True, "vehicleTitle": f"{v['brand']} {v['model']}" if v else "",
+        "vehicleImage": (v.get('images') or [''])[0] if v else "", "clientName": cu["firstName"] if cu else "",
+        "ownerName": (owner.get('company') or owner.get('firstName')) if owner else "",
+        "payout": "auto" if (owner and owner.get("stripe_account_id")) else "en_attente",
+        "createdAt": datetime.now(timezone.utc).isoformat()}
+    await db.bookings.insert_one(doc)
+    await db.payment_transactions.update_one({"session_id": session_id}, {"$set": {"status": "completed", "payment_status": "paid", "booking_ref": ref}})
+    await db.users.update_one({"_id": oid(tx["ownerId"])}, {"$inc": {"rentals": 1}})
+    if cu and v: await send_email(cu["email"], f"Réservation confirmée — {ref}", mail_tpl("Réservation confirmée ✅", f"Paiement reçu. <b>{v['brand']} {v['model']}</b> du {tx['frm']} au {tx['to']}.<br>Total {tx['total']} € (commission 5% : {tx['commission']} €).<br>Référence : <b>{ref}</b>"))
+    if owner and v: await send_email(owner["email"], f"Nouvelle réservation — {ref}", mail_tpl("Nouvelle réservation 🚗", f"<b>{v['brand']} {v['model']}</b>. Net (95%) : <b>{tx['ownerAmount']} €</b>." + ("" if owner.get("stripe_account_id") else "<br>⚠️ Connectez votre compte Stripe (Espace loueur → Revenus) pour recevoir vos reversements automatiquement.")))
+    return tx
+
+@api.get("/payments/status/{session_id}")
+async def payment_status(session_id: str):
+    tx = await db.payment_transactions.find_one({"session_id": session_id})
+    if not tx: raise HTTPException(404, "Transaction introuvable")
+    if tx.get("payment_status") != "paid":
+        try:
+            s = stripe.checkout.Session.retrieve(session_id)
+            if s.payment_status == "paid" or s.status == "complete":
+                await _finalize_booking(session_id)
+                tx = await db.payment_transactions.find_one({"session_id": session_id})
+        except Exception:
+            pass
+    return {"session_id": session_id, "payment_status": tx.get("payment_status"), "booking_ref": tx.get("booking_ref")}
+
+@api.post("/stripe/webhook")
+async def stripe_webhook(request: Request):
+    payload = await request.body(); sig = request.headers.get("stripe-signature", "")
+    try:
+        event = stripe.Webhook.construct_event(payload, sig, STRIPE_WEBHOOK_SECRET)
+    except Exception:
+        raise HTTPException(400, "Invalid signature")
+    if event["type"] == "checkout.session.completed":
+        await _finalize_booking(event["data"]["object"]["id"])
+    return {"status": "ok"}
+
+async def reminder_loop():
+    while True:
+        try:
+            tomorrow = (datetime.now(timezone.utc).date() + timedelta(days=1)).isoformat()
+            rows = await db.appointments.find({"date": tomorrow, "status": "confirmé", "reminded": {"$ne": True}}).to_list(500)
+            for a in rows:
+                cu = await db.users.find_one({"_id": oid(a["userId"])})
+                if cu: await send_email(cu["email"], f"Rappel : RDV demain — {a['ref']}", mail_tpl("Rappel de rendez-vous ⏰", f"Rappel : votre RDV « {a['serviceName']} » chez {a['providerName']} est <b>demain {a['date']} à {a['time']}</b>."))
+                await db.appointments.update_one({"_id": a["_id"]}, {"$set": {"reminded": True}})
+        except Exception as e:
+            logger.error(f"reminder: {e}")
+        await asyncio.sleep(6 * 3600)
 
 # ---------- admin ----------
 async def require_admin(u=Depends(current_user)):
@@ -469,6 +606,7 @@ async def startup():
     await ensure_pro("lavage@swipeupcar.fr","pro123",{"firstName":"Hugo","company":"BullePro Detailing","proType":"LAVAGE","city":"Bordeaux","lat":44.8378,"lng":-0.5792,"description":"Lavage premium et detailing intérieur/extérieur.","rating":4.9,"jobs":310,"since":"2021","services":[{"name":"Lavage extérieur","price":25,"duration":"30min"},{"name":"Complet int/ext","price":59,"duration":"1h30"},{"name":"Detailing premium","price":149,"duration":"4h"}]})
     try: init_storage()
     except Exception as e: logger.error(f"storage init: {e}")
+    asyncio.create_task(reminder_loop())
     logger.info("Seed complete")
 
 app.include_router(api)

@@ -19,7 +19,7 @@ document.getElementById('page').innerHTML=`
 <a href="location.html" style="color:var(--muted);font-size:14px"><i class="fa-solid fa-arrow-left"></i> Retour</a>
 <div style="display:grid;grid-template-columns:1.5fr 1fr;gap:30px;margin-top:14px" class="veh-grid">
  <div>
-  <img id="mainImg" src="${v.images[0]}" style="width:100%;border-radius:18px;aspect-ratio:16/10;object-fit:cover" alt="${v.brand} ${v.model}">
+  <img id="mainImg" src="${v.images[0]}" onclick="openLB(0)" style="width:100%;border-radius:18px;aspect-ratio:16/10;object-fit:cover;cursor:zoom-in" alt="${v.brand} ${v.model}">
   <div style="display:flex;gap:10px;margin-top:10px">${v.images.map((im,i)=>`<img src="${im}" onclick="document.getElementById('mainImg').src='${im}'" style="width:90px;height:64px;object-fit:cover;border-radius:10px;cursor:pointer;border:2px solid ${i===0?'var(--red)':'transparent'}">`).join('')}</div>
   <div style="margin-top:24px"><h1 style="font-size:30px;margin:0">${v.brand} ${v.model}</h1>
    <div style="color:var(--muted);margin-top:4px">${v.year} • ${v.city} (${v.dept}) • <i class="fa-solid fa-star" style="color:var(--amber)"></i> ${v.rating.toFixed(1)} (${v.reviews} avis)</div></div>
@@ -56,6 +56,7 @@ document.getElementById('page').innerHTML=`
  </div></div>
 </div>`;
 const bf=document.getElementById('bFrom'),bt=document.getElementById('bTo');
+(function(){const imgs=v.images||[];let ci=0;const ov=document.createElement('div');ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.92);display:none;z-index:300;align-items:center;justify-content:center';ov.innerHTML='<button id=lbX style="position:absolute;top:18px;right:24px;background:none;border:none;color:#fff;font-size:34px;cursor:pointer">&times;</button><button id=lbP style="position:absolute;left:16px;background:none;border:none;color:#fff;font-size:44px;cursor:pointer">&#8249;</button><img id=lbImg style="max-width:90%;max-height:86%;border-radius:12px"><button id=lbN style="position:absolute;right:16px;background:none;border:none;color:#fff;font-size:44px;cursor:pointer">&#8250;</button>';document.body.appendChild(ov);const set=i=>{ci=(i+imgs.length)%imgs.length;ov.querySelector("#lbImg").src=imgs[ci]};window.openLB=i=>{if(!imgs.length)return;set(i||0);ov.style.display="flex"};ov.querySelector("#lbX").onclick=()=>ov.style.display="none";ov.onclick=e=>{if(e.target===ov)ov.style.display="none"};ov.querySelector("#lbN").onclick=e=>{e.stopPropagation();set(ci+1)};ov.querySelector("#lbP").onclick=e=>{e.stopPropagation();set(ci-1)};document.addEventListener("keydown",e=>{if(ov.style.display==="flex"){if(e.key==="Escape")ov.style.display="none";if(e.key==="ArrowRight")set(ci+1);if(e.key==="ArrowLeft")set(ci-1)}});})();
 bf.value=new URLSearchParams(location.search).get('from')||todayISO();
 bt.value=new URLSearchParams(location.search).get('to')||addDays(todayISO(),3);
 function calc(){const f=bf.value,t=bt.value;if(!f||!t||t<=f){document.getElementById('calc').innerHTML='<span style="color:var(--red)">Sélectionnez des dates valides.</span>';return}const d=daysBetween(f,t);const tot=d*v.price;const comm=Math.round(tot*db.settings.commission);
