@@ -5,10 +5,11 @@ load_dotenv(ROOT_DIR / '.env')
 
 import os, logging, jwt, bcrypt, httpx, asyncio
 from datetime import datetime, timezone, timedelta
-from fastapi import FastAPI, APIRouter, HTTPException, Request, Depends
+from fastapi import FastAPI, APIRouter, HTTPException, Request, Depends, UploadFile, File, Response
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 from bson import ObjectId
+import requests as _rq, uuid
 from pydantic import BaseModel, EmailStr
 from typing import Optional, List
 
@@ -74,6 +75,26 @@ def mail_tpl(title, body):
     <tr><td style="padding:28px"><h1 style="color:#1A1714;font-size:22px;margin:0 0 12px">{title}</h1><div style="color:#40382f;font-size:15px;line-height:1.6">{body}</div></td></tr>
     <tr><td style="padding:18px 28px;background:#EFE6D6;color:#6B6259;font-size:12px">SWIPEUPCAR — plateforme de mise en relation automobile. Ceci est un email transactionnel.</td></tr>
     </table></td></tr></table>"""
+
+# ---------- object storage ----------
+STORAGE_BASE = (os.environ.get("INTEGRATION_PROXY_URL") or "").strip() or "https://integrations.emergentagent.com"
+STORAGE_URL = STORAGE_BASE.rstrip("/") + "/objstore/api/v1/storage"
+_STOR = {"key": None}
+def init_storage(force=False):
+    if _STOR["key"] and not force: return _STOR["key"]
+    r = _rq.post(f"{STORAGE_URL}/init", json={"emergent_key": os.environ.get("EMERGENT_LLM_KEY")}, timeout=30)
+    r.raise_for_status(); _STOR["key"] = r.json()["storage_key"]; return _STOR["key"]
+def put_object(path, data, ct):
+    k = init_storage()
+    r = _rq.put(f"{STORAGE_URL}/objects/{path}", headers={"X-Storage-Key": k, "Content-Type": ct}, data=data, timeout=120)
+    if r.status_code == 404:
+        k = init_storage(True)
+        r = _rq.put(f"{STORAGE_URL}/objects/{path}", headers={"X-Storage-Key": k, "Content-Type": ct}, data=data, timeout=120)
+    r.raise_for_status(); return r.json()
+def get_object(path):
+    k = init_storage()
+    r = _rq.get(f"{STORAGE_URL}/objects/{path}", headers={"X-Storage-Key": k}, timeout=60)
+    r.raise_for_status(); return r.content, r.headers.get("Content-Type", "application/octet-stream")
 
 # ---------- models ----------
 class RegisterIn(BaseModel):
@@ -151,6 +172,21 @@ async def vehicle_out(v):
         v["ownerRating"] = o.get("rating", 0); v["ownerRentals"] = o.get("rentals", 0)
         v["ownerSince"] = o.get("since", "2026"); v["ownerSatisfaction"] = o.get("satisfaction", 0)
     return v
+
+@api.post("/upload")
+async def upload_file(file: UploadFile = File(...), u=Depends(current_user)):
+    ext = (file.filename.rsplit(".", 1)[-1] if "." in (file.filename or "") else "bin").lower()
+    data = await file.read()
+    if len(data) > 6 * 1024 * 1024: raise HTTPException(400, "Image trop volumineuse (max 6 Mo).")
+    path = f"swipeupcar/uploads/{str(u['_id'])}/{uuid.uuid4().hex}.{ext}"
+    res = put_object(path, data, file.content_type or "image/jpeg")
+    return {"url": f"/api/files/{res['path']}"}
+
+@api.get("/files/{path:path}")
+async def serve_file(path: str):
+    try: data, ct = get_object(path)
+    except Exception: raise HTTPException(404, "Fichier introuvable")
+    return Response(content=data, media_type=ct)
 
 @api.get("/vehicles")
 async def list_vehicles():
@@ -283,19 +319,40 @@ async def update_profile(data: ProfileIn, u=Depends(current_user)):
 async def create_appt(data: ApptIn, u=Depends(current_user)):
     p = await db.users.find_one({"_id": oid(data.providerId), "role":"PRO"})
     if not p or p.get("proStatus") != "Validé": raise HTTPException(400, "Professionnel indisponible.")
+    taken = await db.appointments.find_one({"providerId": data.providerId, "date": data.date, "time": data.time, "status": {"$in": ["En attente","confirmé"]}})
+    if taken: raise HTTPException(409, "Ce créneau est déjà réservé.")
     ref = "RDV-" + os.urandom(3).hex().upper()
     doc = {"ref": ref, "userId": str(u["_id"]), "providerId": data.providerId, "proType": p.get("proType"),
            "serviceName": data.serviceName, "price": data.price, "date": data.date, "time": data.time,
-           "status": "confirmé", "clientName": u["firstName"], "providerName": p.get("company") or p.get("firstName"),
+           "status": "En attente", "clientName": u["firstName"], "providerName": p.get("company") or p.get("firstName"),
            "createdAt": datetime.now(timezone.utc).isoformat()}
     res = await db.appointments.insert_one(doc)
-    await db.users.update_one({"_id": p["_id"]}, {"$inc": {"jobs": 1}})
-    await send_email(u["email"], f"Rendez-vous confirmé — {ref}",
-        mail_tpl("Rendez-vous confirmé ✅", f"Votre RDV « {data.serviceName} » chez <b>{doc['providerName']}</b> le {data.date} à {data.time} est confirmé.<br>Référence : <b>{ref}</b>"))
-    await send_email(p["email"], f"Nouveau rendez-vous — {ref}",
-        mail_tpl("Nouveau rendez-vous 📅", f"Nouveau RDV « {data.serviceName} » le {data.date} à {data.time} (client : {u['firstName']}).<br>Référence : {ref}"))
+    await send_email(u["email"], f"Demande de RDV envoyée — {ref}",
+        mail_tpl("Demande de rendez-vous 📅", f"Votre demande de RDV « {data.serviceName} » chez <b>{doc['providerName']}</b> le {data.date} à {data.time} a bien été envoyée.<br>Vous recevrez un email dès que le professionnel confirme.<br>Référence : <b>{ref}</b>"))
+    await send_email(p["email"], f"Nouvelle demande de RDV — {ref}",
+        mail_tpl("Nouvelle demande de RDV 📅", f"Demande « {data.serviceName} » le {data.date} à {data.time} (client : {u['firstName']}).<br>Connectez-vous pour accepter ou refuser.<br>Référence : {ref}"))
     doc["id"] = str(res.inserted_id); doc.pop("_id", None)
     return doc
+
+@api.get("/providers/{pid}/availability")
+async def availability(pid: str, date: str):
+    rows = await db.appointments.find({"providerId": pid, "date": date, "status": {"$in": ["En attente","confirmé"]}}).to_list(200)
+    return {"taken": [r["time"] for r in rows]}
+
+@api.post("/appointments/{aid}/{action}")
+async def appt_action(aid: str, action: str, u=Depends(current_user)):
+    a = await db.appointments.find_one({"_id": oid(aid)})
+    if not a: raise HTTPException(404)
+    if a["providerId"] != str(u["_id"]) and u["role"] != "ADMIN": raise HTTPException(403, "Non autorisé")
+    client = await db.users.find_one({"_id": oid(a["userId"])})
+    if action == "accept":
+        await db.appointments.update_one({"_id": oid(aid)}, {"$set": {"status": "confirmé"}})
+        await db.users.update_one({"_id": oid(a["providerId"])}, {"$inc": {"jobs": 1}})
+        if client: await send_email(client["email"], f"RDV confirmé — {a['ref']}", mail_tpl("Rendez-vous confirmé ✅", f"Votre RDV « {a['serviceName']} » le {a['date']} à {a['time']} est <b>confirmé</b> par le professionnel."))
+    elif action == "refuse":
+        await db.appointments.update_one({"_id": oid(aid)}, {"$set": {"status": "refusé"}})
+        if client: await send_email(client["email"], f"RDV non confirmé — {a['ref']}", mail_tpl("Rendez-vous non confirmé", f"Votre RDV « {a['serviceName']} » du {a['date']} n'a pas pu être confirmé. Vous pouvez choisir un autre créneau."))
+    return {"ok": True}
 
 @api.get("/appointments/mine")
 async def my_appts(u=Depends(current_user)):
@@ -410,6 +467,8 @@ async def startup():
     await ensure_pro("garage@swipeupcar.fr","pro123",{"firstName":"Karim","company":"Garage Central Auto","proType":"GARAGE","city":"Paris","lat":48.8566,"lng":2.3522,"description":"Entretien toutes marques, mécanique et révisions.","rating":4.8,"jobs":230,"since":"2022","services":[{"name":"Vidange + filtres","price":89,"duration":"1h"},{"name":"Révision complète","price":190,"duration":"2h"},{"name":"Plaquettes de frein","price":150,"duration":"1h30"}]})
     await ensure_pro("pneus@swipeupcar.fr","pro123",{"firstName":"Léa","company":"SpeedPneus Lyon","proType":"PNEUMATIQUE","city":"Lyon","lat":45.764,"lng":4.8357,"description":"Montage, équilibrage et géométrie.","rating":4.7,"jobs":180,"since":"2023","services":[{"name":"Montage 2 pneus","price":40,"duration":"45min"},{"name":"Montage 4 pneus","price":70,"duration":"1h"},{"name":"Géométrie","price":60,"duration":"45min"}]})
     await ensure_pro("lavage@swipeupcar.fr","pro123",{"firstName":"Hugo","company":"BullePro Detailing","proType":"LAVAGE","city":"Bordeaux","lat":44.8378,"lng":-0.5792,"description":"Lavage premium et detailing intérieur/extérieur.","rating":4.9,"jobs":310,"since":"2021","services":[{"name":"Lavage extérieur","price":25,"duration":"30min"},{"name":"Complet int/ext","price":59,"duration":"1h30"},{"name":"Detailing premium","price":149,"duration":"4h"}]})
+    try: init_storage()
+    except Exception as e: logger.error(f"storage init: {e}")
     logger.info("Seed complete")
 
 app.include_router(api)

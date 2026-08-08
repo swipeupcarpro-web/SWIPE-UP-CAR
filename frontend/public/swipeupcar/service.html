@@ -30,7 +30,8 @@ document.getElementById('page').innerHTML=`
    <label class="label">Date</label><input class="input" type="date" id="d" min="${todayISO()}" value="${addDays(todayISO(),1)}" data-testid="rdv-date">
    <label class="label" style="margin-top:12px">Heure</label>
    <select class="input" id="h" data-testid="rdv-time">${['08:00','09:00','10:00','11:00','14:00','15:00','16:00','17:00'].map(x=>`<option>${x}</option>`).join('')}</select>
-   <button class="btn btn-red" style="width:100%;margin-top:16px" id="book" data-testid="rdv-submit"><i class="fa-regular fa-calendar-check"></i> Confirmer le RDV</button>
+   <button class="btn btn-red" style="width:100%;margin-top:16px" id="book" data-testid="rdv-submit"><i class="fa-regular fa-calendar-check"></i> Demander le RDV</button>
+   <p style="color:var(--muted);font-size:12px;text-align:center;margin-top:8px">Le professionnel confirmera votre créneau. Aucun paiement en ligne.</p>
  </div></div>
 </div>`;
 document.getElementById('book').onclick=()=>{
@@ -38,9 +39,11 @@ document.getElementById('book').onclick=()=>{
   const idx=+document.querySelector('input[name=svc]:checked').value;const sv=p.services[idx];
   const b=document.getElementById('book');b.disabled=true;b.innerHTML='<i class="fa-solid fa-spinner fa-spin"></i> ...';
   const r=apiSync('/appointments','POST',{providerId:id,serviceName:sv.name,price:sv.price,date:document.getElementById('d').value,time:document.getElementById('h').value});
-  if(r.error){toast(r.error);b.disabled=false;b.innerHTML='Réessayer';return;}
-  toast('RDV confirmé ! Réf '+r.ref);setTimeout(()=>location.href='compte.html#rdv',900);
+  if(r.error){toast(r.error);b.disabled=false;b.innerHTML='<i class="fa-regular fa-calendar-check"></i> Demander le RDV';refreshSlots();return;}
+  toast('Demande envoyée ! Réf '+r.ref);setTimeout(()=>location.href='compte.html#rdv',1000);
 };
+function refreshSlots(){const d=document.getElementById('d').value;const av=apiSync('/providers/'+id+'/availability?date='+d);const taken=(av&&av.taken)||[];const sel=document.getElementById('h');[...sel.options].forEach(o=>{o.disabled=taken.includes(o.value);o.textContent=o.value+(taken.includes(o.value)?' — indisponible':'');});const first=[...sel.options].find(o=>!o.disabled);if(first)sel.value=first.value;}
+document.getElementById('d').addEventListener('change',refreshSlots);refreshSlots();
 }
 </script>
 <style>@media(max-width:860px){.sv-grid{grid-template-columns:1fr!important}}</style>

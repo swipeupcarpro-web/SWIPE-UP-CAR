@@ -154,4 +154,5 @@ function vehicleCard(v){
 }
 
 loadState();
+function apiUpload(file){const x=new XMLHttpRequest();const fd=new FormData();fd.append('file',file);try{x.open('POST',API_ROOT+'/upload',false);const t=localStorage.getItem('suc_token');if(t)x.setRequestHeader('Authorization','Bearer '+t);x.send(fd);}catch(e){return{error:'upload'}}let j={};try{j=JSON.parse(x.responseText||'{}')}catch(e){}if(x.status<200||x.status>=300)return{error:j.detail||'upload'};return j;}
 document.addEventListener('DOMContentLoaded',()=>{ renderNav(); renderFooter(); renderMobileNav(); });

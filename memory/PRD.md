@@ -35,7 +35,10 @@ index, location (recherche+filtres+tri), vehicule (fiche+réservation), reservat
   - Emails RDV client + prestataire. Validation prestataire par admin.
 - Comptes pro démo : garage@swipeupcar.fr / pneus@swipeupcar.fr / lavage@swipeupcar.fr (mdp pro123).
 
-## Backlog production
-- P0 : Stripe Connect réel (location), upload photos réel, vérif email, textes juridiques validés avocat.
-- P1 : favoris/messagerie/avis en base, annulations, domaine + déploiement.
-- P2 : Pièces auto (e-commerce), SEO.
+## Implémenté (récent)
+- Photos réelles : object storage Emergent — POST /api/upload (auth, max 6 Mo), GET /api/files/{path}. Loueur "Ajouter un véhicule" upload multi-photos réel.
+- RDV avec créneaux : anti double-réservation serveur (409), GET /providers/{id}/availability?date.
+- Confirmation Pro : RDV créé "En attente" → POST /appointments/{id}/{accept|refuse} → "confirmé/refusé" + emails. Dashboard pro (Accepter/Refuser), statuts colorés côté client.
+
+## Reste (P0)
+- Stripe Connect : encaissement réel des locations + reversement auto 95% aux loueurs (nécessite onboarding Stripe de chaque loueur). À faire en passe dédiée.
