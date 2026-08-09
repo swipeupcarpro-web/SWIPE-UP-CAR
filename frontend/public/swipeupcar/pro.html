@@ -24,6 +24,7 @@ if(u){
  const TL={GARAGE:'Entretien / Garage',PNEUMATIQUE:'Pneus',LAVAGE:'Lavage',PIECES:'Pièces auto'};
  const isPieces=me.proType==='PIECES';
  if(isPieces){['services','rdv'].forEach(k=>{const el=document.querySelector('.sidebar a[data-t='+k+']');if(el)el.remove();});const pf=document.querySelector('.sidebar a[data-t=profile]');if(pf)pf.innerHTML='<i class="fa-regular fa-user"></i> Mon annonce';}
+ let proPhotos=(me.photos||[]).slice();
  function refresh(){me=apiSync('/providers/me/profile');}
  function banner(){if(me.proStatus&&me.proStatus!=='Validé')return `<div class="card" style="padding:16px;background:#FFF3E0;border-color:#ffe0b2;margin-bottom:16px"><b><i class="fa-solid fa-clock" style="color:var(--amber)"></i> Compte ${me.proStatus}</b><div style="font-size:14px;color:#7a5b1a">Votre vitrine sera visible publiquement après validation par l'administration.</div></div>`;return ''}
  function render(t){
@@ -58,6 +59,10 @@ if(u){
      <label class="label" style="margin-top:12px">Téléphone</label><input class="input" id="pph" value="${me.phone||''}" data-testid="pro-phone">
      <label class="label" style="margin-top:12px">Adresse</label><input class="input" id="pad" value="${me.address||''}" data-testid="pro-address">
      <label class="label" style="margin-top:12px">Site web</label><input class="input" id="pws" value="${me.website||''}" placeholder="https://" data-testid="pro-website">
+     <label class="label" style="margin-top:12px">Photos de votre ${isPieces?'boutique':'établissement'}</label>
+     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">${proPhotos.map((ph,i)=>`<div style="position:relative"><img src="${ph}" style="width:92px;height:66px;object-fit:cover;border-radius:8px"><button type="button" onclick="delProPhoto(${i})" style="position:absolute;top:-7px;right:-7px;background:var(--red);color:#fff;border:none;border-radius:50%;width:22px;height:22px;line-height:1;cursor:pointer">×</button></div>`).join('')||'<span style="color:var(--muted);font-size:13px">Aucune photo pour le moment.</span>'}</div>
+     <input type="file" id="proPhotoInput" accept="image/*" multiple data-testid="pro-photo-input">
+     <button type="button" class="btn btn-ghost" style="margin-top:6px" onclick="addProPhotos()" data-testid="add-photos"><i class="fa-solid fa-image"></i> Ajouter des photos</button>
      ${hoursBlock}
      <button class="btn btn-red" style="margin-top:14px" onclick="saveProfile()" data-testid="save-profile">Enregistrer</button></div>`;
   }
@@ -68,7 +73,9 @@ if(u){
  window.refuseRdv=(aid)=>{const r=apiSync('/appointments/'+aid+'/refuse','POST');if(r.error){toast(r.error);return}toast('RDV refusé');render('rdv')};
  window.addSvc=()=>{const name=sn.value.trim();if(!name){toast('Nom requis');return}const r=apiSync('/providers/service','POST',{name,price:+sp.value||0,duration:sd.value});if(r.error){toast(r.error);return}refresh();toast('Prestation ajoutée');render('services')};
  window.delSvc=(name)=>{const r=apiSync('/providers/service/'+encodeURIComponent(name),'DELETE');if(r.error){toast(r.error);return}refresh();toast('Prestation supprimée');render('services')};
- window.saveProfile=()=>{const cd=[...document.querySelectorAll('.cd:checked')].map(x=>+x.value);const payload={company:pc.value,city:pv.value,description:pd.value,phone:pph.value,address:pad.value,website:pws.value};const oh=document.getElementById('poh');if(oh){payload.openHour=+oh.value;payload.closeHour=+document.getElementById('pch').value;payload.closedDays=cd;}const r=apiSync('/providers/profile','POST',payload);if(r.error){toast(r.error);return}refresh();toast('Enregistré ✅')};
+ window.addProPhotos=()=>{const fi=document.getElementById('proPhotoInput');if(!fi||!fi.files.length){toast('Choisissez une image');return}for(const f of fi.files){const up=apiUpload(f);if(up&&up.url)proPhotos.push(up.url);}proPhotos=proPhotos.slice(0,8);toast('Photos ajoutées — pensez à Enregistrer');render('profile');};
+ window.delProPhoto=(i)=>{proPhotos.splice(i,1);render('profile');};
+ window.saveProfile=()=>{const cd=[...document.querySelectorAll('.cd:checked')].map(x=>+x.value);const payload={company:pc.value,city:pv.value,description:pd.value,phone:pph.value,address:pad.value,website:pws.value,photos:proPhotos};const oh=document.getElementById('poh');if(oh){payload.openHour=+oh.value;payload.closeHour=+document.getElementById('pch').value;payload.closedDays=cd;}const r=apiSync('/providers/profile','POST',payload);if(r.error){toast(r.error);return}refresh();proPhotos=(me.photos||[]).slice();toast('Enregistré ✅')};
  render('dash');
 }
 </script>

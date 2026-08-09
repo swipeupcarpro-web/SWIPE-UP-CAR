@@ -42,7 +42,7 @@ if(u){
     const favs=((Session.get().favorites)||[]).map(id=>db.vehicles.find(v=>v.id===id)).filter(Boolean);
     M.innerHTML=`<h1 style="font-size:26px">Mes favoris</h1>${favs.length?`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:18px;margin-top:16px">${favs.map(vehicleCard).join('')}</div>`:empty('Aucun favori','Ajoutez des véhicules à vos favoris avec le ♥.','location.html','Explorer')}`;
   } else if(t==='reviews'){
-    const done=myBookings().filter(b=>b.to<todayISO());const revs=db.reviews.filter(r=>r.userId===u.id);
+    const done=myBookings().filter(b=>b.to<todayISO());const revsArr=apiSync('/reviews/mine');const revs=Array.isArray(revsArr)?revsArr:[];
     M.innerHTML=`<h1 style="font-size:26px">Mes avis</h1><p style="color:var(--muted)">Notez vos locations passées.</p>${done.length?done.map(b=>{const v=db.vehicles.find(x=>x.id===b.vehicleId);const has=revs.find(r=>r.bookingId===b.id);return `<div class="card" style="padding:16px;margin-top:12px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><div><b>${v.brand} ${v.model}</b><div style="color:var(--muted);font-size:13px">${b.ref}</div></div>${has?`<span>${'★'.repeat(has.rating)}</span>`:`<button class="btn btn-red" onclick="leaveReview('${b.id}','${v.id}')">Laisser un avis</button>`}</div>`}).join(''):empty('Aucune location terminée','Vos avis seront possibles après vos locations.','location.html','Réserver')}`;
   } else if(t==='rdv'){
     const rdvs=apiSync('/appointments/mine');const arr=Array.isArray(rdvs)?rdvs:[];
@@ -61,7 +61,7 @@ if(u){
  function empty(t,d,link,cta){return `<div class="card" style="padding:50px 20px;text-align:center;margin-top:16px"><i class="fa-solid fa-inbox" style="font-size:38px;color:var(--muted)"></i><h3 style="margin:14px 0 6px">${t}</h3><p style="color:var(--muted)">${d}</p><a href="${link}" class="btn btn-red" style="margin-top:12px">${cta}</a></div>`}
  window.resendVerif=()=>{apiSync('/auth/resend-verification','POST');toast('Email de confirmation renvoyé');};
  window.saveProfile=()=>{toast('Profil enregistré')};
- window.leaveReview=(bid,vid)=>{const r=prompt('Note de 1 à 5 :','5');const n=Math.max(1,Math.min(5,+r||5));const db=DB.get();db.reviews.push({id:uid('R'),bookingId:bid,vehicleId:vid,userId:u.id,rating:n,text:'Très bonne expérience',date:new Date().toISOString()});DB.set(db);toast('Merci pour votre avis !');render('reviews')};
+ window.leaveReview=(bid,vid)=>{const r=prompt('Note de 1 à 5 :','5');if(r===null)return;const n=Math.max(1,Math.min(5,+r||5));const txt=prompt('Votre commentaire (facultatif) :','')||'';const res=apiSync('/reviews','POST',{bookingId:bid,rating:n,text:txt});if(res&&res.error){toast(res.error);return}toast('Merci pour votre avis !');render('reviews')};
  const _h=(location.hash||'').replace('#','');
  if(_h==='rdv'){document.querySelector('[data-t=rdv]').click();}
  else if(_h==='fav'){document.querySelector('[data-t=fav]').click();}

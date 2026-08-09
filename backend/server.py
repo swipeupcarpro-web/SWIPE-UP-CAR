@@ -98,6 +98,28 @@ def get_object(path):
     r = _rq.get(f"{STORAGE_URL}/objects/{path}", headers={"X-Storage-Key": k}, timeout=60)
     r.raise_for_status(); return r.content, r.headers.get("Content-Type", "application/octet-stream")
 
+# ---------- geocoding (villes FR) ----------
+FR_CITIES = {"paris":(48.8566,2.3522),"lyon":(45.764,4.8357),"marseille":(43.2965,5.3698),"bordeaux":(44.8378,-0.5792),"lille":(50.6292,3.0573),"toulouse":(43.6047,1.4442),"nice":(43.7102,7.262),"nantes":(47.2184,-1.5536),"strasbourg":(48.5734,7.7521),"montpellier":(43.6108,3.8767),"rennes":(48.1173,-1.6778),"grenoble":(45.1885,5.7245),"rouen":(49.4432,1.0993),"toulon":(43.1242,5.928),"reims":(49.2583,4.0317),"le havre":(49.4944,0.1079),"dijon":(47.322,5.0415),"angers":(47.4784,-0.5632),"nimes":(43.8367,4.3601),"clermont-ferrand":(45.7772,3.087),"tours":(47.3941,0.6848),"amiens":(49.8941,2.2957),"metz":(49.1193,6.1757),"besancon":(47.238,6.0243),"perpignan":(42.6887,2.8948),"orleans":(47.9029,1.9093),"caen":(49.1829,-0.3707),"mulhouse":(47.7508,7.3359),"pau":(43.2951,-0.3708),"avignon":(43.9493,4.8055),"annecy":(45.8992,6.1294),"cannes":(43.5528,7.0174)}
+_geo_cache = {}
+async def geocode_city(q):
+    if not q: return None
+    key = q.strip().lower()
+    if key in _geo_cache: return _geo_cache[key]
+    for c, coords in FR_CITIES.items():
+        if c in key or key in c:
+            _geo_cache[key] = coords; return coords
+    try:
+        async with httpx.AsyncClient(timeout=8) as cl:
+            r = await cl.get("https://nominatim.openstreetmap.org/search",
+                params={"q": q + ", France", "format": "json", "limit": 1, "countrycodes": "fr"},
+                headers={"User-Agent": "SwipeUpCar/1.0 (swipeupcar.pro@gmail.com)"})
+        j = r.json()
+        if j:
+            res = (float(j[0]["lat"]), float(j[0]["lon"])); _geo_cache[key] = res; return res
+    except Exception as e:
+        logger.error(f"geocode fail {q}: {e}")
+    return None
+
 # ---------- models ----------
 class RegisterIn(BaseModel):
     firstName: str; lastName: str = ""; email: EmailStr; password: str
@@ -110,6 +132,7 @@ class ServiceIn(BaseModel):
 class ProfileIn(BaseModel):
     city: str = ""; description: str = ""; company: str = ""
     phone: Optional[str] = None; address: Optional[str] = None; website: Optional[str] = None
+    photos: Optional[List[str]] = None
     openHour: Optional[int] = None; closeHour: Optional[int] = None; closedDays: Optional[List[int]] = None
 class ApptIn(BaseModel):
     providerId: str; serviceName: str; price: float = 0; date: str; time: str
@@ -124,6 +147,8 @@ class VehicleIn(BaseModel):
     desc: str = ""; status: str = "pending"
 class BookingIn(BaseModel):
     vehicleId: str; frm: str; to: str
+class ReviewIn(BaseModel):
+    bookingId: str; rating: int; text: str = ""
 
 # ---------- auth ----------
 @api.post("/auth/register")
@@ -141,10 +166,11 @@ async def register(data: RegisterIn):
                     "since": str(datetime.now().year), "satisfaction": 0})
     if role == "PRO":
         pt = data.proType if data.proType in SERVICE_TYPES else "LAVAGE"
+        g = await geocode_city(data.city or "")
         doc.update({"company": data.company, "siret": data.siret, "proType": pt,
-                    "city": data.city or "", "lat": 46.6, "lng": 2.2, "description": "",
+                    "city": data.city or "", "lat": g[0] if g else 46.6, "lng": g[1] if g else 2.2, "description": "",
                     "proStatus": "En vérification", "rating": 0, "jobs": 0,
-                    "since": str(datetime.now().year), "services": []})
+                    "since": str(datetime.now().year), "services": [], "photos": []})
     token = uuid.uuid4().hex
     doc["verify_token"] = token; doc["site_origin"] = data.origin_url or ""
     res = await db.users.insert_one(doc)
@@ -284,7 +310,7 @@ async def owner_bookings(u=Depends(current_user)):
 def provider_pub(u):
     d = {"id": str(u["_id"]), "firstName": u.get("firstName"), "company": u.get("company"),
             "proType": u.get("proType"), "city": u.get("city",""), "lat": u.get("lat",46.6), "lng": u.get("lng",2.2),
-            "description": u.get("description",""), "services": u.get("services",[]),
+            "description": u.get("description",""), "services": u.get("services",[]), "photos": u.get("photos",[]),
             "verified": u.get("verified",False), "rating": u.get("rating",0), "jobs": u.get("jobs",0), "since": u.get("since","2026")}
     if u.get("proType") == "PIECES":
         d["phone"] = u.get("phone",""); d["address"] = u.get("address",""); d["website"] = u.get("website","")
@@ -322,7 +348,13 @@ async def del_service(name: str, u=Depends(current_user)):
 @api.post("/providers/profile")
 async def update_profile(data: ProfileIn, u=Depends(current_user)):
     if u["role"] != "PRO": raise HTTPException(403)
-    upd = {k: v for k, v in data.model_dump().items() if v is not None and v != ""}
+    d = data.model_dump()
+    photos = d.pop("photos", None)
+    upd = {k: v for k, v in d.items() if v is not None and v != ""}
+    if photos is not None: upd["photos"] = photos[:8]
+    if data.city and data.city != u.get("city"):
+        g = await geocode_city(data.city)
+        if g: upd["lat"] = g[0]; upd["lng"] = g[1]
     await db.users.update_one({"_id": u["_id"]}, {"$set": upd})
     return {"ok": True}
 
@@ -563,6 +595,58 @@ async def send_message(cid: str, data: MsgIn, u=Depends(current_user)):
         {"$push": {"messages": msg}, "$set": {"updatedAt": msg["date"]}})
     return {"message": msg, "warn": warn}
 
+# ---------- geocode + reviews ----------
+@api.get("/geocode")
+async def geocode(q: str):
+    r = await geocode_city(q)
+    if not r: return {"found": False}
+    return {"found": True, "lat": r[0], "lng": r[1]}
+
+async def recompute_vehicle_rating(vid):
+    revs = await db.reviews.find({"vehicleId": vid}).to_list(2000)
+    n = len(revs); avg = round(sum(r["rating"] for r in revs) / n, 2) if n else 0
+    await db.vehicles.update_one({"_id": oid(vid)}, {"$set": {"rating": avg, "reviews": n}})
+    v = await db.vehicles.find_one({"_id": oid(vid)})
+    if v and v.get("owner"):
+        own_vs = await db.vehicles.find({"owner": v["owner"]}).to_list(500)
+        ids = [str(x["_id"]) for x in own_vs]
+        allr = await db.reviews.find({"vehicleId": {"$in": ids}}).to_list(4000)
+        m = len(allr)
+        if m:
+            oavg = round(sum(r["rating"] for r in allr) / m, 2)
+            sat = round(100 * sum(1 for r in allr if r["rating"] >= 4) / m)
+            await db.users.update_one({"_id": oid(v["owner"])}, {"$set": {"rating": oavg, "satisfaction": sat}})
+
+@api.post("/reviews")
+async def create_review(data: ReviewIn, u=Depends(current_user)):
+    b = await db.bookings.find_one({"_id": oid(data.bookingId)})
+    if not b or b["userId"] != str(u["_id"]): raise HTTPException(404, "Réservation introuvable.")
+    if b.get("to", "") >= datetime.now(timezone.utc).date().isoformat():
+        raise HTTPException(400, "Vous pourrez laisser un avis après la fin de la location.")
+    if await db.reviews.find_one({"bookingId": data.bookingId}):
+        raise HTTPException(400, "Vous avez déjà laissé un avis pour cette location.")
+    rating = max(1, min(5, data.rating))
+    doc = {"bookingId": data.bookingId, "vehicleId": b["vehicleId"], "userId": str(u["_id"]),
+           "ownerId": b.get("ownerId"), "clientName": u.get("firstName", ""), "rating": rating,
+           "text": (data.text or "").strip()[:600], "vehicleTitle": b.get("vehicleTitle", ""),
+           "createdAt": datetime.now(timezone.utc).isoformat()}
+    res = await db.reviews.insert_one(doc)
+    await recompute_vehicle_rating(b["vehicleId"])
+    doc["id"] = str(res.inserted_id); doc.pop("_id", None)
+    return doc
+
+@api.get("/reviews/vehicle/{vid}")
+async def vehicle_reviews(vid: str):
+    revs = await db.reviews.find({"vehicleId": vid}).sort("createdAt", -1).to_list(200)
+    for r in revs: r["id"] = str(r.pop("_id"))
+    return revs
+
+@api.get("/reviews/mine")
+async def my_reviews(u=Depends(current_user)):
+    revs = await db.reviews.find({"userId": str(u["_id"])}).to_list(500)
+    for r in revs: r["id"] = str(r.pop("_id"))
+    return revs
+
 # ---------- admin ----------
 async def require_admin(u=Depends(current_user)):
     if u["role"] != "ADMIN": raise HTTPException(403, "Réservé à l'administration")
@@ -692,6 +776,12 @@ async def startup():
     await ensure_pro("pneus@swipeupcar.fr","pro123",{"firstName":"Léa","company":"SpeedPneus Lyon","proType":"PNEUMATIQUE","city":"Lyon","lat":45.764,"lng":4.8357,"description":"Montage, équilibrage et géométrie.","rating":4.7,"jobs":180,"since":"2023","services":[{"name":"Montage 2 pneus","price":40,"duration":"45min"},{"name":"Montage 4 pneus","price":70,"duration":"1h"},{"name":"Géométrie","price":60,"duration":"45min"}]})
     await ensure_pro("lavage@swipeupcar.fr","pro123",{"firstName":"Hugo","company":"BullePro Detailing","proType":"LAVAGE","city":"Bordeaux","lat":44.8378,"lng":-0.5792,"description":"Lavage premium et detailing intérieur/extérieur.","rating":4.9,"jobs":310,"since":"2021","services":[{"name":"Lavage extérieur","price":25,"duration":"30min"},{"name":"Complet int/ext","price":59,"duration":"1h30"},{"name":"Detailing premium","price":149,"duration":"4h"}]})
     await ensure_pro("pieces@swipeupcar.fr","pro123",{"firstName":"Marc","company":"AutoPièces Express","proType":"PIECES","city":"Lille","lat":50.6292,"lng":3.0573,"phone":"03 20 12 34 56","address":"12 rue des Mécaniciens, 59000 Lille","website":"https://autopieces-express.fr","description":"Pièces neuves et d'occasion toutes marques : freinage, filtration, embrayage, carrosserie, pare-brise. Devis rapide et conseils.","rating":4.6,"jobs":0,"since":"2022","services":[]})
+    _demo_photos = {"garage@swipeupcar.fr":["https://images.unsplash.com/photo-1676018366904-c083ed678e60?w=900&q=80","https://images.unsplash.com/photo-1618312980096-873bd19759a0?w=900&q=80"],
+        "pneus@swipeupcar.fr":["https://images.unsplash.com/photo-1764699186616-8f707281e4f3?w=900&q=80","https://images.unsplash.com/photo-1765446004204-aa52f4c11167?w=900&q=80"],
+        "lavage@swipeupcar.fr":["https://images.unsplash.com/photo-1633014041037-f5446fb4ce99?w=900&q=80","https://images.unsplash.com/photo-1608506375591-b90e1f955e4b?w=900&q=80"],
+        "pieces@swipeupcar.fr":["https://images.unsplash.com/photo-1611633235555-45e252fe48c8?w=900&q=80","https://images.unsplash.com/photo-1486262715619-67b85e0b08d3?w=900&q=80"]}
+    for _em, _ph in _demo_photos.items():
+        await db.users.update_one({"email": _em, "$or": [{"photos": {"$exists": False}}, {"photos": []}]}, {"$set": {"photos": _ph}})
     try: init_storage()
     except Exception as e: logger.error(f"storage init: {e}")
     asyncio.create_task(reminder_loop())
