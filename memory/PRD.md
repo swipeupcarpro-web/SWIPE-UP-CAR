@@ -71,6 +71,9 @@ index, location (recherche+filtres+tri), vehicule (fiche+réservation), reservat
 - **Encart accueil « Trouvez un pro près de chez vous »** : sur index.html, champ ville + catégorie (entretien/pneus/lavage/pièces) redirigeant vers `services.html?s=<cat>&zone=<ville>`.
 - Tests : 66/66 pytest backend + frontend 100% (iteration_5.json).
 
+## Implémenté (session fork — juin 2026, suite 5)
+- **Expérience mobile (design conservé)** : correction responsive complète. Cause racine trouvée : attributs `class=` en double sur les conteneurs dashboard/location → les media queries étaient inertes ; contenu tassé et débordements. Corrigé + règles globales dans `style.css` (repli 1 colonne du héro, des formulaires de recherche, des tableaux de bord, des grilles de specs via `.stack-sm`, `minmax(0,1fr)`, `img{max-width:100%}`). Résultat : 10/10 pages sans débordement horizontal à 390px, desktop 1280px inchangé (iteration_7.json, 100%).
+
 ## Reste (P0/P1)
 - Migrer les **avis (reviews)** de localStorage vers la base (toujours en local). (P1) — ✅ FAIT (suite 2)
 - Module **Pièces auto** (e-commerce : catalogue, panier, livraison). (P1)
