@@ -14,7 +14,7 @@
       <button class="btn btn-red" style="width:100%;margin-top:18px" data-testid="login-submit">Connexion</button>
     </form>
     <p style="text-align:center;margin-top:16px;font-size:14px">Pas encore de compte ? <a href="inscription.html" style="color:var(--red);font-weight:700">S'inscrire</a></p>
-    <div class="card" style="padding:14px;margin-top:18px;background:var(--cream-2)">
+    <div id="demoAccounts" class="card" style="padding:14px;margin-top:18px;background:var(--cream-2);display:none" data-testid="demo-accounts">
       <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase">Comptes de démonstration</div>
       <div style="font-size:13px;margin-top:8px;line-height:1.7">
         👤 Client : <b>client@swipeupcar.fr</b> / client123<br>
@@ -27,6 +27,7 @@
 <div id="footer"></div>
 <script src="assets/app.js"></script>
 <script>
+fetch(API_ROOT+'/config').then(r=>r.json()).then(c=>{if(c&&c.demo_mode){document.getElementById('demoAccounts').style.display='block';}}).catch(()=>{});
 document.getElementById('loginForm').onsubmit=e=>{e.preventDefault();const f=new FormData(e.target);const u=login(f.get('email'),f.get('password'));
  if(!u){const el=document.getElementById('err');el.style.display='block';el.textContent='Email ou mot de passe incorrect.';return}
  const next=new URLSearchParams(location.search).get('next');

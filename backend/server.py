@@ -191,6 +191,10 @@ async def login(data: LoginIn):
         raise HTTPException(401, "Email ou mot de passe incorrect.")
     return {"token": make_token(str(u["_id"])), "user": clean_user(u)}
 
+@api.get("/config")
+async def get_config():
+    return {"demo_mode": os.environ.get("DEMO_MODE", "false").strip().lower() == "true"}
+
 @api.get("/auth/me")
 async def me(u=Depends(current_user)):
     return clean_user(u)

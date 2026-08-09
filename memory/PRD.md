@@ -85,3 +85,11 @@ index, location (recherche+filtres+tri), vehicule (fiche+réservation), reservat
 - Stripe Connect onboarding : gérer l'erreur si le loueur n'a pas finalisé son compte Stripe. (P1) — NB : modèle 5% only, pas de reversement 95%.
 - SMS rappels RDV (P2), modération photo auto (plaques/QR/téléphone) (P2).
 - Compléter les champs société des mentions légales (SIRET, adresse, hébergeur, directeur de publication). (P2)
+
+## DEMO_MODE (preview vs production GitHub) — 2026-06-09
+- Variable env `DEMO_MODE` (backend/.env). Preview = "true", production GitHub = absente/false.
+- `GET /api/config` → `{demo_mode: bool}` (server.py).
+- Seed données démo (server.py startup) exécuté UNIQUEMENT si DEMO_MODE=true.
+- `connexion.html` récupère /api/config et masque le bloc identifiants de démo si demo_mode=false.
+- Résultat : preview reste une démo (données + identifiants visibles) ; code poussé sur GitHub = base propre sans fausses données ni identifiants.
+- Vérifié : curl /api/config → {"demo_mode":true} en preview ; screenshot connexion → bloc démo visible.
