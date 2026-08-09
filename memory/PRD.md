@@ -55,8 +55,14 @@ index, location (recherche+filtres+tri), vehicule (fiche+réservation), reservat
 - **Filtre par zone/ville sur les services** : champ « Votre ville ou secteur » sur `services.html` (filtrage en direct par ville/adresse, comme les locations). Compteur de résultats + conservation du secteur entre onglets.
 - Seed : vendeur de pièces démo `pieces@swipeupcar.fr` (AutoPièces Express, Lille).
 
+## Implémenté (session fork — juin 2026, suite 2)
+- **Avis en base** : avis clients migrés de localStorage vers MongoDB (collection `reviews`), liés à une location terminée (note 1-5 + commentaire). `POST /api/reviews` (auth, anti-doublon, réservation terminée requise), `GET /api/reviews/vehicle/{id}` (public), `GET /api/reviews/mine`. La note moyenne + nombre d'avis du véhicule ET la note/satisfaction du loueur sont recalculées automatiquement. Affichés sur la fiche véhicule et dans compte.html.
+- **Photos pour tous les pros** (garage/pneus/lavage/pièces) : upload dans pro.html (« Ma vitrine »/« Mon annonce »), stockées via object storage + `/providers/profile`. Affichées en vignette sur les cartes `services.html` et en galerie sur `service.html`. 4 pros de démo pré-remplis avec photos.
+- **Filtre par distance/rayon** sur les services : géocodage de la ville (dictionnaire villes FR + fallback Nominatim), rayon 10/25/50/100 km, tri par distance + badge « à X km ». `GET /api/geocode`. Villes des pros géocodées à l'inscription et à la sauvegarde du profil.
+- Tests : 45/45 pytest backend + frontend 100% (iteration_3.json).
+
 ## Reste (P0/P1)
-- Migrer les **avis (reviews)** de localStorage vers la base (toujours en local). (P1)
+- Migrer les **avis (reviews)** de localStorage vers la base (toujours en local). (P1) — ✅ FAIT (suite 2)
 - Module **Pièces auto** (e-commerce : catalogue, panier, livraison). (P1)
 - Stripe Connect onboarding : gérer l'erreur si le loueur n'a pas finalisé son compte Stripe. (P1) — NB : modèle 5% only, pas de reversement 95%.
 - SMS rappels RDV (P2), modération photo auto (plaques/QR/téléphone) (P2).
