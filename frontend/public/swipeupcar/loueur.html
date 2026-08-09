@@ -92,8 +92,6 @@ if(u){
   if(r.error){toast(r.error);return}loadState();
   toast(status==='draft'?'Brouillon enregistré':'Véhicule soumis à validation');document.querySelector('[data-t=vehicles]').click();};
  window.submitV=(id)=>{const r=apiSync('/vehicles/'+id+'/submit','POST');if(r.error){toast(r.error);return}loadState();toast('Soumis à validation');document.querySelector('[data-t=vehicles]').click();};
- window.connectStripe=()=>{const r=apiSync('/stripe/connect/onboard','POST',{origin_url:window.location.origin});if(r.error){toast(r.error);return}window.location=r.url};
- window.connectStripe=()=>{const r=apiSync('/stripe/connect/onboard','POST',{origin_url:window.location.origin});if(r.error){toast(r.error);return}window.location=r.url};
  window.delV=(id)=>{if(!confirm('Supprimer ce véhicule ?'))return;const r=apiSync('/vehicles/'+id,'DELETE');if(r.error){toast(r.error);return}loadState();toast('Véhicule supprimé');document.querySelector('[data-t=vehicles]').click();};
  render('dash');
 }

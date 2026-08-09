@@ -21,7 +21,9 @@ if(u){
  let me=apiSync('/providers/me/profile');
  const tabs=[...document.querySelectorAll('.sidebar a[data-t]')];
  tabs.forEach(t=>t.onclick=()=>{tabs.forEach(x=>x.classList.remove('active'));t.classList.add('active');render(t.dataset.t)});
- const TL={GARAGE:'Entretien / Garage',PNEUMATIQUE:'Pneus',LAVAGE:'Lavage'};
+ const TL={GARAGE:'Entretien / Garage',PNEUMATIQUE:'Pneus',LAVAGE:'Lavage',PIECES:'Pièces auto'};
+ const isPieces=me.proType==='PIECES';
+ if(isPieces){['services','rdv'].forEach(k=>{const el=document.querySelector('.sidebar a[data-t='+k+']');if(el)el.remove();});const pf=document.querySelector('.sidebar a[data-t=profile]');if(pf)pf.innerHTML='<i class="fa-regular fa-user"></i> Mon annonce';}
  function refresh(){me=apiSync('/providers/me/profile');}
  function banner(){if(me.proStatus&&me.proStatus!=='Validé')return `<div class="card" style="padding:16px;background:#FFF3E0;border-color:#ffe0b2;margin-bottom:16px"><b><i class="fa-solid fa-clock" style="color:var(--amber)"></i> Compte ${me.proStatus}</b><div style="font-size:14px;color:#7a5b1a">Votre vitrine sera visible publiquement après validation par l'administration.</div></div>`;return ''}
  function render(t){
@@ -35,6 +37,8 @@ if(u){
      <div class="stat"><div class="num">${me.jobs||0}</div><div style="color:var(--muted)">Interventions</div></div>
     </div><h2 style="font-size:20px;margin-top:24px">Prochains rendez-vous</h2>${rdvList(arr.slice(0,5))}`;
   } else if(t==='services'){
+    if(isPieces){M.innerHTML=banner()+`<h1 style="font-size:26px">Prestations</h1><p style="color:var(--muted)">Les prestations et rendez-vous ne s'appliquent pas aux vendeurs de pièces. Renseignez vos coordonnées dans « Mon annonce » pour être visible dans l'annuaire.</p>`;return;}
+    if(me.proStatus&&me.proStatus!=='Validé'){M.innerHTML=banner()+`<h1 style="font-size:26px">Mes prestations</h1><div class="card" style="padding:28px;text-align:center;color:var(--muted);margin-top:14px"><i class="fa-solid fa-lock" style="font-size:30px;color:var(--amber)"></i><p>Vous pourrez publier vos prestations une fois votre compte <b>validé par l'administration</b>.</p></div>`;return;}
     M.innerHTML=banner()+`<h1 style="font-size:26px">Mes prestations</h1>
     <div style="margin-top:14px">${(me.services||[]).map(sv=>`<div class="card" style="padding:14px;display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><div><b>${sv.name}</b> <span style="color:var(--muted);font-size:13px">${sv.duration||''}</span></div><div style="display:flex;gap:12px;align-items:center"><b>${sv.price} €</b><button class="btn btn-ghost" style="padding:5px 10px" onclick="delSvc('${sv.name.replace(/'/g,"")}')"><i class="fa-solid fa-trash"></i></button></div></div>`).join('')||'<p style="color:var(--muted)">Aucune prestation. Ajoutez-en une ci-dessous.</p>'}</div>
     <div class="card" style="padding:18px;margin-top:12px"><h3 style="margin-top:0">Ajouter une prestation</h3>
@@ -43,14 +47,19 @@ if(u){
   } else if(t==='rdv'){
     M.innerHTML=`<h1 style="font-size:26px">Rendez-vous</h1>${rdvList(arr)}`;
   } else if(t==='profile'){
-    M.innerHTML=`<h1 style="font-size:26px">Ma vitrine</h1><div class="card" style="padding:22px;margin-top:14px;max-width:520px">
-     <label class="label">Entreprise</label><input class="input" id="pc" value="${me.company||''}">
-     <label class="label" style="margin-top:12px">Ville</label><input class="input" id="pv" value="${me.city||''}">
-     <label class="label" style="margin-top:12px">Description</label><textarea class="input" id="pd" rows="4">${me.description||''}</textarea>
+    const hoursBlock = isPieces ? '' : `
      <div style="display:flex;gap:12px;margin-top:12px"><div style="flex:1"><label class="label">Ouverture (h)</label><input class="input" id="poh" type="number" min="0" max="23" value="${me.openHour!=null?me.openHour:8}"></div><div style="flex:1"><label class="label">Fermeture (h)</label><input class="input" id="pch" type="number" min="1" max="24" value="${me.closeHour!=null?me.closeHour:18}"></div></div>
      <label class="label" style="margin-top:12px">Jours de fermeture</label>
-     <div style="display:flex;gap:10px;flex-wrap:wrap">${['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'].map((d,i)=>`<label style="display:flex;gap:5px;font-size:14px"><input type="checkbox" class="cd" value="${i}" ${(me.closedDays||[]).includes(i)?'checked':''}> ${d}</label>`).join('')}</div>
-     <button class="btn btn-red" style="margin-top:14px" onclick="saveProfile()">Enregistrer</button></div>`;
+     <div style="display:flex;gap:10px;flex-wrap:wrap">${['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'].map((d,i)=>`<label style="display:flex;gap:5px;font-size:14px"><input type="checkbox" class="cd" value="${i}" ${(me.closedDays||[]).includes(i)?'checked':''}> ${d}</label>`).join('')}</div>`;
+    M.innerHTML=banner()+`<h1 style="font-size:26px">${isPieces?'Mon annonce':'Ma vitrine'}</h1>${isPieces?'<p style="color:var(--muted)">Vos coordonnées seront affichées directement aux clients dans l\'annuaire Pièces auto (après validation).</p>':''}<div class="card" style="padding:22px;margin-top:14px;max-width:520px">
+     <label class="label">Entreprise</label><input class="input" id="pc" value="${me.company||''}">
+     <label class="label" style="margin-top:12px">Ville</label><input class="input" id="pv" value="${me.city||''}">
+     <label class="label" style="margin-top:12px">Description ${isPieces?'(spécialités, marques, neuf/occasion)':''}</label><textarea class="input" id="pd" rows="4">${me.description||''}</textarea>
+     <label class="label" style="margin-top:12px">Téléphone</label><input class="input" id="pph" value="${me.phone||''}" data-testid="pro-phone">
+     <label class="label" style="margin-top:12px">Adresse</label><input class="input" id="pad" value="${me.address||''}" data-testid="pro-address">
+     <label class="label" style="margin-top:12px">Site web</label><input class="input" id="pws" value="${me.website||''}" placeholder="https://" data-testid="pro-website">
+     ${hoursBlock}
+     <button class="btn btn-red" style="margin-top:14px" onclick="saveProfile()" data-testid="save-profile">Enregistrer</button></div>`;
   }
  }
  function rdvChip(s){const m={'En attente':['#FFF3E0','var(--amber)'],'confirmé':['#E8F5E9','var(--green)'],'refusé':['#FDEAEA','var(--red)']}[s]||['#eee','#556'];return `<span class="chip" style="background:${m[0]};color:${m[1]};border:none">${s}</span>`}
@@ -59,7 +68,7 @@ if(u){
  window.refuseRdv=(aid)=>{const r=apiSync('/appointments/'+aid+'/refuse','POST');if(r.error){toast(r.error);return}toast('RDV refusé');render('rdv')};
  window.addSvc=()=>{const name=sn.value.trim();if(!name){toast('Nom requis');return}const r=apiSync('/providers/service','POST',{name,price:+sp.value||0,duration:sd.value});if(r.error){toast(r.error);return}refresh();toast('Prestation ajoutée');render('services')};
  window.delSvc=(name)=>{const r=apiSync('/providers/service/'+encodeURIComponent(name),'DELETE');if(r.error){toast(r.error);return}refresh();toast('Prestation supprimée');render('services')};
- window.saveProfile=()=>{const cd=[...document.querySelectorAll('.cd:checked')].map(x=>+x.value);const r=apiSync('/providers/profile','POST',{company:pc.value,city:pv.value,description:pd.value,openHour:+poh.value,closeHour:+pch.value,closedDays:cd});if(r.error){toast(r.error);return}refresh();toast('Vitrine enregistrée')};
+ window.saveProfile=()=>{const cd=[...document.querySelectorAll('.cd:checked')].map(x=>+x.value);const payload={company:pc.value,city:pv.value,description:pd.value,phone:pph.value,address:pad.value,website:pws.value};const oh=document.getElementById('poh');if(oh){payload.openHour=+oh.value;payload.closeHour=+document.getElementById('pch').value;payload.closedDays=cd;}const r=apiSync('/providers/profile','POST',payload);if(r.error){toast(r.error);return}refresh();toast('Enregistré ✅')};
  render('dash');
 }
 </script>

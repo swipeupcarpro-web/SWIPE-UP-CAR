@@ -1,5 +1,5 @@
 <!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Prendre rendez-vous | SWIPEUPCAR</title><meta name="robots" content="noindex">
+<title>Fiche professionnel | SWIPEUPCAR</title><meta name="robots" content="noindex">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"><link rel="stylesheet" href="assets/style.css"></head>
 <body><div id="nav"></div>
@@ -9,8 +9,27 @@
 <script>
 const id=new URLSearchParams(location.search).get('id');
 const p=apiSync('/providers/'+id); const ok=p&&!p.error;
-const TYPE={GARAGE:['🔧','Entretien'],PNEUMATIQUE:['🛞','Pneus'],LAVAGE:['🧽','Lavage']};
+const TYPE={GARAGE:['🔧','Entretien'],PNEUMATIQUE:['🛞','Pneus'],LAVAGE:['🧽','Lavage'],PIECES:['🧩','Pièces auto']};
 if(!ok){document.getElementById('page').innerHTML='<div class="card" style="padding:50px;text-align:center"><h2>Professionnel introuvable</h2><a href="services.html" class="btn btn-red">Retour</a></div>';}
+else if(p.proType==='PIECES'){
+ const tel=(p.phone||'').replace(/\s/g,'');
+ document.getElementById('page').innerHTML=`
+ <a href="services.html?s=pieces" style="color:var(--muted);font-size:14px"><i class="fa-solid fa-arrow-left"></i> Retour aux pièces auto</a>
+ <div style="max-width:660px;margin-top:12px">
+  <div style="font-size:44px">🧩</div>
+  <h1 style="font-size:30px;margin:4px 0">${p.company||p.firstName}</h1>
+  <div style="color:var(--muted)"><i class="fa-solid fa-location-dot"></i> ${p.city} • Pièces auto • <i class="fa-solid fa-star" style="color:var(--amber)"></i> ${(p.rating||0).toFixed(1)} ${p.verified?'• <span style="color:var(--green)"><i class="fa-solid fa-circle-check"></i> Vérifié</span>':''}</div>
+  <p style="margin-top:12px;color:#40382f">${p.description||''}</p>
+  <div class="card" style="padding:22px;margin-top:16px;display:grid;gap:12px">
+   <h3 style="margin:0">Coordonnées</h3>
+   ${p.address?`<div><i class="fa-solid fa-location-dot" style="color:var(--red);width:22px"></i> ${p.address}</div>`:''}
+   ${p.phone?`<div><i class="fa-solid fa-phone" style="color:var(--red);width:22px"></i> <a href="tel:${tel}" style="color:inherit">${p.phone}</a></div>`:''}
+   ${p.website?`<div><i class="fa-solid fa-globe" style="color:var(--red);width:22px"></i> <a href="${p.website}" target="_blank" rel="noopener" style="color:var(--red)">${p.website}</a></div>`:''}
+   <div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap">${p.phone?`<a class="btn btn-red" href="tel:${tel}" data-testid="call-provider"><i class="fa-solid fa-phone"></i> Appeler</a>`:''}${p.address?`<a class="btn btn-dark" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent((p.address||'')+' '+p.city)}" target="_blank" rel="noopener"><i class="fa-solid fa-diamond-turn-right"></i> Itinéraire</a>`:''}</div>
+   <p style="color:var(--muted);font-size:12px;margin:0"><i class="fa-solid fa-circle-info"></i> Contactez directement le vendeur. SWIPEUPCAR n'intervient pas dans la vente de pièces.</p>
+  </div>
+ </div>`;
+}
 else{
 const t=TYPE[p.proType]||['🔧',''];
 document.getElementById('page').innerHTML=`
@@ -42,7 +61,7 @@ document.getElementById('book').onclick=()=>{
   if(r.error){toast(r.error);b.disabled=false;b.innerHTML='<i class="fa-regular fa-calendar-check"></i> Demander le RDV';refreshSlots();return;}
   toast('Demande envoyée ! Réf '+r.ref);setTimeout(()=>location.href='compte.html#rdv',1000);
 };
-function refreshSlots(){const d=document.getElementById('d').value;const av=apiSync('/providers/'+id+'/availability?date='+d);const slots=(av&&av.slots)||[];const taken=(av&&av.taken)||[];const sel=document.getElementById('h');const btn=document.getElementById('book');if(av&&av.closed){sel.innerHTML='<option>Fermé ce jour</option>';btn.disabled=true;btn.style.opacity=.5;return}btn.disabled=false;btn.style.opacity=1;sel.innerHTML=slots.map(s=>`<option value="${s}" ${taken.includes(s)?'disabled':''}>${s}${taken.includes(s)?' — indisponible':''}</option>`).join('')||'<option>Aucun créneau</option>';const first=slots.find(s=>!taken.includes(s));if(first)sel.value=first;}
+function refreshSlots(){const d=document.getElementById('d').value;const av=apiSync('/providers/'+id+'/availability?date='+d);const slots=(av&&av.slots)||[];const taken=(av&&av.taken)||[];const sel=document.getElementById('h');const btn=document.getElementById('book');if(av&&av.closed){sel.innerHTML='<option>Fermé ce jour</option>';btn.disabled=true;btn.style.opacity=.5;return}btn.disabled=false;btn.style.opacity=1;sel.innerHTML=slots.map(sv=>`<option value="${sv}" ${taken.includes(sv)?'disabled':''}>${sv}${taken.includes(sv)?' — indisponible':''}</option>`).join('')||'<option>Aucun créneau</option>';const first=slots.find(sv=>!taken.includes(sv));if(first)sel.value=first;}
 document.getElementById('d').addEventListener('change',refreshSlots);refreshSlots();
 }
 </script>

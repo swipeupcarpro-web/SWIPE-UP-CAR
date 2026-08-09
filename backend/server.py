@@ -104,11 +104,12 @@ class RegisterIn(BaseModel):
     phone: str = ""; role: str = "PARTICULIER"
     company: Optional[str] = None; siret: Optional[str] = None; iban: Optional[str] = None
     proType: Optional[str] = None; city: Optional[str] = None; origin_url: Optional[str] = None
-SERVICE_TYPES = {"GARAGE", "PNEUMATIQUE", "LAVAGE"}
+SERVICE_TYPES = {"GARAGE", "PNEUMATIQUE", "LAVAGE", "PIECES"}
 class ServiceIn(BaseModel):
     name: str; price: float = 0; duration: str = ""
 class ProfileIn(BaseModel):
     city: str = ""; description: str = ""; company: str = ""
+    phone: Optional[str] = None; address: Optional[str] = None; website: Optional[str] = None
     openHour: Optional[int] = None; closeHour: Optional[int] = None; closedDays: Optional[List[int]] = None
 class ApptIn(BaseModel):
     providerId: str; serviceName: str; price: float = 0; date: str; time: str
@@ -281,10 +282,13 @@ async def owner_bookings(u=Depends(current_user)):
 
 # ---------- providers (services: garage/pneus/lavage) - RDV only ----------
 def provider_pub(u):
-    return {"id": str(u["_id"]), "firstName": u.get("firstName"), "company": u.get("company"),
+    d = {"id": str(u["_id"]), "firstName": u.get("firstName"), "company": u.get("company"),
             "proType": u.get("proType"), "city": u.get("city",""), "lat": u.get("lat",46.6), "lng": u.get("lng",2.2),
             "description": u.get("description",""), "services": u.get("services",[]),
             "verified": u.get("verified",False), "rating": u.get("rating",0), "jobs": u.get("jobs",0), "since": u.get("since","2026")}
+    if u.get("proType") == "PIECES":
+        d["phone"] = u.get("phone",""); d["address"] = u.get("address",""); d["website"] = u.get("website","")
+    return d
 
 @api.get("/providers")
 async def list_providers(type: str):
@@ -305,6 +309,7 @@ async def my_provider(u=Depends(current_user)):
 @api.post("/providers/service")
 async def add_service(data: ServiceIn, u=Depends(current_user)):
     if u["role"] != "PRO": raise HTTPException(403)
+    if u.get("proStatus") != "Validé": raise HTTPException(403, "Votre compte doit être validé par l'administration avant de publier des prestations.")
     await db.users.update_one({"_id": u["_id"]}, {"$push": {"services": data.model_dump()}})
     return {"ok": True}
 
@@ -381,39 +386,9 @@ async def pro_appts(u=Depends(current_user)):
     for r in rows: r["id"] = str(r.pop("_id"))
     return rows
 
-# ---------- Stripe (paiements marketplace + Connect) ----------
-class OnboardIn(BaseModel):
-    origin_url: str
+# ---------- Stripe (paiement des frais de réservation 5%) ----------
 class BookingCheckoutIn(BaseModel):
     vehicleId: str; frm: str; to: str; origin_url: str
-
-@api.post("/stripe/connect/onboard")
-async def connect_onboard(data: OnboardIn, u=Depends(current_user)):
-    if u["role"] not in ("LOUEUR","ADMIN"): raise HTTPException(403, "Réservé aux loueurs")
-    acct = u.get("stripe_account_id")
-    if not acct:
-        try:
-            a = stripe.Account.create(type="express", country="FR", email=u["email"],
-                capabilities={"transfers": {"requested": True}, "card_payments": {"requested": True}})
-        except Exception:
-            raise HTTPException(400, "Stripe Connect n'est pas encore activé sur la plateforme. Activez « Connect » dans votre dashboard Stripe (Réglages → Connect) pour permettre les reversements automatiques de 95% aux loueurs. Le paiement des locations fonctionne déjà.")
-        acct = a.id
-        await db.users.update_one({"_id": u["_id"]}, {"$set": {"stripe_account_id": acct}})
-    link = stripe.AccountLink.create(account=acct,
-        refresh_url=data.origin_url + "/swipeupcar/loueur.html",
-        return_url=data.origin_url + "/swipeupcar/loueur.html?connected=1",
-        type="account_onboarding")
-    return {"url": link.url}
-
-@api.get("/stripe/connect/status")
-async def connect_status(u=Depends(current_user)):
-    acct = u.get("stripe_account_id")
-    if not acct: return {"connected": False, "charges_enabled": False}
-    try:
-        a = stripe.Account.retrieve(acct)
-        return {"connected": True, "charges_enabled": bool(a.charges_enabled), "payouts_enabled": bool(a.payouts_enabled)}
-    except Exception:
-        return {"connected": False, "charges_enabled": False}
 
 @api.post("/payments/checkout/booking")
 async def checkout_booking(data: BookingCheckoutIn, u=Depends(current_user)):
@@ -716,6 +691,7 @@ async def startup():
     await ensure_pro("garage@swipeupcar.fr","pro123",{"firstName":"Karim","company":"Garage Central Auto","proType":"GARAGE","city":"Paris","lat":48.8566,"lng":2.3522,"description":"Entretien toutes marques, mécanique et révisions.","rating":4.8,"jobs":230,"since":"2022","services":[{"name":"Vidange + filtres","price":89,"duration":"1h"},{"name":"Révision complète","price":190,"duration":"2h"},{"name":"Plaquettes de frein","price":150,"duration":"1h30"}]})
     await ensure_pro("pneus@swipeupcar.fr","pro123",{"firstName":"Léa","company":"SpeedPneus Lyon","proType":"PNEUMATIQUE","city":"Lyon","lat":45.764,"lng":4.8357,"description":"Montage, équilibrage et géométrie.","rating":4.7,"jobs":180,"since":"2023","services":[{"name":"Montage 2 pneus","price":40,"duration":"45min"},{"name":"Montage 4 pneus","price":70,"duration":"1h"},{"name":"Géométrie","price":60,"duration":"45min"}]})
     await ensure_pro("lavage@swipeupcar.fr","pro123",{"firstName":"Hugo","company":"BullePro Detailing","proType":"LAVAGE","city":"Bordeaux","lat":44.8378,"lng":-0.5792,"description":"Lavage premium et detailing intérieur/extérieur.","rating":4.9,"jobs":310,"since":"2021","services":[{"name":"Lavage extérieur","price":25,"duration":"30min"},{"name":"Complet int/ext","price":59,"duration":"1h30"},{"name":"Detailing premium","price":149,"duration":"4h"}]})
+    await ensure_pro("pieces@swipeupcar.fr","pro123",{"firstName":"Marc","company":"AutoPièces Express","proType":"PIECES","city":"Lille","lat":50.6292,"lng":3.0573,"phone":"03 20 12 34 56","address":"12 rue des Mécaniciens, 59000 Lille","website":"https://autopieces-express.fr","description":"Pièces neuves et d'occasion toutes marques : freinage, filtration, embrayage, carrosserie, pare-brise. Devis rapide et conseils.","rating":4.6,"jobs":0,"since":"2022","services":[]})
     try: init_storage()
     except Exception as e: logger.error(f"storage init: {e}")
     asyncio.create_task(reminder_loop())

@@ -191,6 +191,136 @@ class TestVerificationBlock:
         assert r.json().get("ok") is True
 
 
+# ---------- Iteration 2 : Stripe supprimé, PIECES, validation pro ----------
+class TestStripeConnectRemoved:
+    def test_onboard_removed(self):
+        # Try with sophie loueur token (was intended to onboard) - should be 404
+        r = _login(*OWNER)
+        tok = r.json()["token"]
+        rr = requests.post(f"{API}/stripe/connect/onboard", headers=_auth_headers(tok), timeout=30)
+        assert rr.status_code == 404, f"Endpoint should be removed, got {rr.status_code}"
+
+    def test_status_removed(self):
+        r = _login(*OWNER)
+        tok = r.json()["token"]
+        rr = requests.get(f"{API}/stripe/connect/status", headers=_auth_headers(tok), timeout=30)
+        assert rr.status_code == 404
+
+    def test_loueur_html_no_connectStripe(self):
+        r = requests.get(f"{BASE_URL}/swipeupcar/loueur.html", timeout=30)
+        assert r.status_code == 200
+        html = r.text
+        assert "connectStripe" not in html, "loueur.html still contains connectStripe function"
+        assert "stripe/connect/onboard" not in html
+
+
+class TestPiecesProvidersDirectory:
+    def test_pieces_provider_listed(self):
+        r = requests.get(f"{API}/providers?type=PIECES", timeout=30)
+        assert r.status_code == 200
+        arr = r.json()
+        assert isinstance(arr, list) and len(arr) >= 1
+        p = next((x for x in arr if x.get("company") == "AutoPièces Express"), None)
+        assert p is not None, f"AutoPièces Express not found in {arr}"
+        assert p.get("phone")
+        assert p.get("address")
+        assert p.get("website")
+        assert p.get("proType") == "PIECES"
+
+    def test_get_pieces_provider_detail(self):
+        arr = requests.get(f"{API}/providers?type=PIECES", timeout=30).json()
+        pid = arr[0]["id"]
+        r = requests.get(f"{API}/providers/{pid}", timeout=30)
+        assert r.status_code == 200
+        d = r.json()
+        assert d["proType"] == "PIECES"
+        assert "phone" in d and "address" in d and "website" in d
+
+
+@pytest.fixture(scope="module")
+def new_pro_pieces():
+    """Register a fresh PIECES pro (unvalidated)"""
+    email = f"TEST_pro_pieces_{uuid.uuid4().hex[:8]}@test.fr"
+    r = requests.post(f"{API}/auth/register", json={
+        "firstName": "Test", "lastName": "Pieces", "email": email,
+        "password": "test1234", "role": "PRO", "proType": "PIECES",
+        "company": "TEST PIECES Co", "city": "Paris"
+    }, timeout=30)
+    assert r.status_code == 200, r.text
+    return r.json()["token"], r.json()["user"]["id"], email
+
+
+@pytest.fixture(scope="module")
+def new_pro_garage():
+    email = f"TEST_pro_garage_{uuid.uuid4().hex[:8]}@test.fr"
+    r = requests.post(f"{API}/auth/register", json={
+        "firstName": "Test", "lastName": "Garage", "email": email,
+        "password": "test1234", "role": "PRO", "proType": "GARAGE",
+        "company": "TEST Garage Co", "city": "Paris"
+    }, timeout=30)
+    assert r.status_code == 200, r.text
+    return r.json()["token"], r.json()["user"]["id"], email
+
+
+class TestProValidationGate:
+    def test_unvalidated_pro_status(self, new_pro_pieces):
+        tok, uid, email = new_pro_pieces
+        r = requests.get(f"{API}/auth/me", headers=_auth_headers(tok), timeout=30)
+        assert r.status_code == 200
+        assert r.json().get("proStatus") == "En vérification"
+        assert r.json().get("proType") == "PIECES"
+
+    def test_unvalidated_pro_cannot_add_service(self, new_pro_garage):
+        tok, uid, _ = new_pro_garage
+        r = requests.post(f"{API}/providers/service",
+                          json={"name": "Vidange", "price": 89, "duration": "1h"},
+                          headers=_auth_headers(tok), timeout=30)
+        assert r.status_code == 403
+        detail = r.json().get("detail", "").lower()
+        assert "validé" in detail or "administration" in detail, f"Unexpected detail: {detail}"
+
+    def test_pieces_pro_update_profile(self, new_pro_pieces):
+        tok, uid, _ = new_pro_pieces
+        r = requests.post(f"{API}/providers/profile", json={
+            "city": "Marseille", "description": "Test annonce pièces",
+            "phone": "0491000000", "address": "1 rue Test 13000 Marseille",
+            "website": "https://test-pieces.fr"
+        }, headers=_auth_headers(tok), timeout=30)
+        assert r.status_code == 200
+        # Verify persistence via /auth/me
+        me = requests.get(f"{API}/auth/me", headers=_auth_headers(tok), timeout=30).json()
+        assert me.get("phone") == "0491000000"
+        assert me.get("address") == "1 rue Test 13000 Marseille"
+        assert me.get("website") == "https://test-pieces.fr"
+
+    def test_admin_validate_and_then_service_add(self, new_pro_garage):
+        tok, uid, _ = new_pro_garage
+        # Admin login
+        ar = _login(*ADMIN)
+        assert ar.status_code == 200
+        atok = ar.json()["token"]
+        # Validate
+        vr = requests.post(f"{API}/admin/owners/{uid}/validate",
+                           headers=_auth_headers(atok), timeout=30)
+        assert vr.status_code == 200, vr.text
+        # Now add service should work
+        r = requests.post(f"{API}/providers/service",
+                          json={"name": "TEST Vidange", "price": 89, "duration": "1h"},
+                          headers=_auth_headers(tok), timeout=30)
+        assert r.status_code == 200, r.text
+        # Verify present in providers list
+        pr = requests.get(f"{API}/providers?type=GARAGE", timeout=30).json()
+        found = next((x for x in pr if x["id"] == uid), None)
+        assert found is not None, "Validated GARAGE pro should appear in directory"
+        assert any(s["name"] == "TEST Vidange" for s in found.get("services", []))
+
+    def test_unvalidated_pieces_not_in_directory(self, new_pro_pieces):
+        tok, uid, _ = new_pro_pieces
+        arr = requests.get(f"{API}/providers?type=PIECES", timeout=30).json()
+        found = [x for x in arr if x["id"] == uid]
+        assert not found, "Unvalidated PIECES pro should NOT appear in public directory"
+
+
 # ---------- Legal pages served ----------
 class TestLegalPages:
     @pytest.mark.parametrize("path", [
