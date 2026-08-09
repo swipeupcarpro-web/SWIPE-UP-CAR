@@ -16,7 +16,7 @@
   </form>
 </div></div>
 
-<div class="container" style="padding:22px 20px;display:grid;grid-template-columns:270px 1fr;gap:26px" class="loc-grid">
+<div class="container loc-grid" style="padding:22px 20px;display:grid;grid-template-columns:270px 1fr;gap:26px">
   <!-- Filters -->
   <aside class="card" style="padding:18px;height:fit-content;position:sticky;top:80px" id="filters">
     <div style="font-weight:800;font-size:16px;margin-bottom:14px">Filtres</div>
@@ -88,5 +88,5 @@ document.getElementById('mapToggle').onclick=function(){const el=document.getEle
 document.querySelectorAll('#filters input,#sort').forEach(el=>el.addEventListener('change',render));
 render();
 </script>
-<style>@media(max-width:860px){.loc-grid{grid-template-columns:1fr!important}#filters{position:static!important}.search-grid{grid-template-columns:1fr 1fr!important}}</style>
+<style>@media(max-width:860px){.loc-grid{grid-template-columns:minmax(0,1fr)!important}#filters{position:static!important}.search-grid{grid-template-columns:1fr 1fr!important}}@media(max-width:600px){.search-grid{grid-template-columns:1fr!important}}</style>
 </body></html>

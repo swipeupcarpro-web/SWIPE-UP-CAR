@@ -31,7 +31,7 @@ document.getElementById('page').innerHTML=`
   <h3 style="margin-top:20px">Équipements</h3>
   <div style="display:flex;flex-wrap:wrap;gap:8px">${v.features.map(f=>`<span class="chip"><i class="fa-solid fa-check" style="color:var(--green)"></i> ${f}</span>`).join('')}</div>
   <h3 style="margin-top:20px">Conditions</h3>
-  <div class="card" style="padding:16px;display:grid;grid-template-columns:1fr 1fr;gap:10px 20px">
+  <div class="card stack-sm" style="padding:16px;display:grid;grid-template-columns:1fr 1fr;gap:10px 20px">
    ${spec('fa-id-card','Âge min.',v.minAge+' ans')}${spec('fa-address-card','Permis','Requis, > 2 ans')}${spec('fa-route','Km inclus',v.mileageInc+' km/jour')}${spec('fa-shield','Caution',money(v.deposit))}${spec('fa-gas-pump','Carburant','Plein à rendre')}${spec('fa-rotate-left','Annulation','Gratuite 48h avant')}
   </div>
   <!-- Owner -->
@@ -72,5 +72,5 @@ window.contactOwner=()=>{if(!Session.get()){location.href='connexion.html';retur
 window.reportReview=(rid)=>{if(!Session.get()){toast('Connectez-vous pour signaler');setTimeout(()=>location.href='connexion.html',600);return}const reason=prompt('Pourquoi signaler cet avis ? (facultatif)','Contenu inapproprié');if(reason===null)return;const res=apiSync('/reviews/'+rid+'/report','POST',{reason});if(res&&res.error){toast(res.error);return}toast('Avis signalé — merci, notre équipe va vérifier');};
 }
 </script>
-<style>@media(max-width:860px){.veh-grid{grid-template-columns:1fr!important}}</style>
+<style>@media(max-width:860px){.veh-grid{grid-template-columns:minmax(0,1fr)!important}}</style>
 </body></html>

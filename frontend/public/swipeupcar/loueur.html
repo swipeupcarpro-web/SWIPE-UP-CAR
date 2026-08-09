@@ -3,7 +3,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"><link rel="stylesheet" href="assets/style.css"></head>
 <body><div id="nav"></div>
-<div class="container" style="padding:22px 20px;display:grid;grid-template-columns:230px 1fr;gap:24px" class="dash-grid">
+<div class="container dash-grid" style="padding:22px 20px;display:grid;grid-template-columns:230px 1fr;gap:24px">
   <aside class="sidebar card hide-mobile" style="padding:14px;height:fit-content;position:sticky;top:80px">
     <a data-t="dash" class="active"><i class="fa-solid fa-gauge"></i> Tableau de bord</a>
     <a data-t="vehicles"><i class="fa-solid fa-car"></i> Mes véhicules</a>
@@ -62,8 +62,8 @@ if(u){
      </div>
      <h3>Équipements</h3><div style="display:flex;flex-wrap:wrap;gap:12px">${['GPS','CarPlay','Android Auto','Caméra','Climatisation','Toit panoramique','Siège bébé'].map(f=>`<label style="display:flex;gap:6px;font-size:14px"><input type="checkbox" name="feat" value="${f}"> ${f}</label>`).join('')}</div>
      <h3>Photos</h3><input class="input" type="file" multiple accept="image/*" id="photos"><p style="color:var(--muted);font-size:12px">Les photos sont compressées et optimisées. La 1re photo est la photo principale. (Démo : une image d'exemple sera utilisée.)</p>
-     <h3>Tarification</h3><div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px"><div><label class="label">Prix / jour (€)</label><input class="input" type="number" name="price" required></div><div><label class="label">Prix week-end</label><input class="input" type="number" name="priceWe"></div><div><label class="label">Prix semaine</label><input class="input" type="number" name="priceWeek"></div></div>
-     <h3>Conditions</h3><div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px"><div><label class="label">Âge min.</label><input class="input" type="number" name="minAge" value="21"></div><div><label class="label">Km inclus/jour</label><input class="input" type="number" name="mileageInc" value="250"></div><div><label class="label">Caution (€)</label><input class="input" type="number" name="deposit" value="1000"></div></div>
+     <h3>Tarification</h3><div class="stack-sm" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px"><div><label class="label">Prix / jour (€)</label><input class="input" type="number" name="price" required></div><div><label class="label">Prix week-end</label><input class="input" type="number" name="priceWe"></div><div><label class="label">Prix semaine</label><input class="input" type="number" name="priceWeek"></div></div>
+     <h3>Conditions</h3><div class="stack-sm" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px"><div><label class="label">Âge min.</label><input class="input" type="number" name="minAge" value="21"></div><div><label class="label">Km inclus/jour</label><input class="input" type="number" name="mileageInc" value="250"></div><div><label class="label">Caution (€)</label><input class="input" type="number" name="deposit" value="1000"></div></div>
      <label class="label" style="margin-top:12px">Description</label><textarea class="input" name="desc" rows="3"></textarea>
      <div style="display:flex;gap:10px;margin-top:18px"><button class="btn btn-ghost" type="button" onclick="saveVehicle('draft')">Enregistrer en brouillon</button><button class="btn btn-red" type="button" onclick="saveVehicle('pending')" data-testid="submit-vehicle">Soumettre à validation</button></div>
     </form>`;
@@ -101,5 +101,5 @@ if(u){
  render('dash');
 }
 </script>
-<style>@media(max-width:860px){.dash-grid{grid-template-columns:1fr!important}}</style>
+<style>@media(max-width:860px){.dash-grid{grid-template-columns:minmax(0,1fr)!important}}</style>
 </body></html>

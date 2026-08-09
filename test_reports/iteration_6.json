@@ -1,0 +1,57 @@
+{
+  "summary": "Responsive mobile (390px) testing on SWIPEUPCAR. Identified & fixed a critical HTML typo (duplicate class= attributes) across 5 files (admin/compte/loueur/pro/location) that prevented .dash-grid/.loc-grid classes from being applied, so all mobile media queries were silently no-op. Also fixed grid tracks stuck on `1fr` (which uses min-content) causing horizontal overflow — replaced with `minmax(0,1fr)!important` in style.css and inline <style> blocks (admin/compte/loueur/pro/vehicule). Added `img{max-width:100%;height:auto}` global. Added 600px breakpoint override for location.html .search-grid (was stuck at 1fr 1fr on mobile). After fixes, 8/9 target pages have zero horizontal overflow at 390px, desktop 1280 unchanged.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "vehicule.html spec card (.card.stack-sm)", "issue": "Residual ~92px horizontal overflow at 390px — spec items still render as 2 columns visually and content extends beyond viewport. .stack-sm computed gtc=316px (1 col) but item children have intrinsic width ~205px that don't shrink. Need to enforce `.stack-sm{display:grid !important;grid-template-columns:1fr!important}` at ≤600 without inline override, OR wrap long labels/values. Root cause: inline `style=\"display:grid;grid-template-columns:1fr 1fr\"` on the .card.stack-sm (line 34) may be creating a specificity/parsing quirk when combined with the media rule.", "selector": ".card.stack-sm on /swipeupcar/vehicule.html", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [
+    "Fix residual overflow on vehicule.html specs card at 390px (see ui_bug above). Suggested: change inline style to remove display/grid-template-columns (let CSS class handle it), define .stack-sm base rule in style.css with default 2-col, mobile 1-col.",
+    "Consider auditing other pages for similar duplicate `class=` attributes (fixed 5 already: admin/compte/loueur/pro/location).",
+    "Consider making `.hide-mobile` breakpoint (860px) align with new 768px mobile rules for consistency."
+  ],
+  "critical_code_review_comments": [
+    "CRITICAL HTML BUG (fixed): Duplicate `class=` attribute in 5 files (`<div class=\"container\" ... class=\"dash-grid\">`) — browsers ignore the 2nd class attr, so `.dash-grid`/`.loc-grid` never existed on those elements, making all responsive media queries silently no-op. This is why the user saw 'tassé' mobile rendering.",
+    "CSS grid `1fr` = `minmax(auto,1fr)` — auto min-content prevents shrinking below content width, causing overflow on mobile when children (tables, images, long text) have large min-content. Always use `minmax(0,1fr)` for main content grids at mobile breakpoints.",
+    "Missing global `img{max-width:100%;height:auto}` was causing vehicule mainImg to render at natural width (481px). Fixed.",
+    "Inline <style> blocks per-page duplicate media-query logic and can override global style.css rules due to load order; recommend consolidating breakpoints into style.css."
+  ],
+  "updated_files": [
+    "/app/frontend/public/swipeupcar/assets/style.css",
+    "/app/frontend/public/swipeupcar/admin.html",
+    "/app/frontend/public/swipeupcar/compte.html",
+    "/app/frontend/public/swipeupcar/loueur.html",
+    "/app/frontend/public/swipeupcar/pro.html",
+    "/app/frontend/public/swipeupcar/location.html",
+    "/app/frontend/public/swipeupcar/vehicule.html"
+  ],
+  "success_rate": {"backend": "n/a", "frontend": "89% (8/9 pages no-overflow at 390px, all correct desktop 1280)"},
+  "test_credentials": "Client client@swipeupcar.fr/client123 ; Loueur sophie@swipeupcar.fr/loueur123 ; Pro garage@swipeupcar.fr/pro123 ; Admin swipeupcar.pro@gmail.com/SwipeAdmin@2026",
+  "seed_data_creation": "None",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Test at 390px viewport with page.set_viewport_size({width:390,height:844}) and check `document.documentElement.scrollWidth <= innerWidth+2`. Key pages: index, location, services (entretien/pieces), vehicule?id=<v>, reservation?id=<v>, compte (client), pro (garage@), loueur (sophie), admin. Desktop regression at 1280px: hero must be 2 cols, dash-grid 230px+1fr, loc-grid 270px+1fr. Remaining bug is on vehicule.html specs card only.",
+  "results_390px": {
+    "index": "OK",
+    "location": "OK",
+    "services-entretien": "OK",
+    "services-pieces": "OK",
+    "compte": "OK",
+    "pro": "OK",
+    "admin": "OK",
+    "loueur": "OK (fixed)",
+    "reservation": "OK",
+    "vehicule": "Overflow ~92px on specs card (needs fix)"
+  },
+  "results_1280px_regression": {
+    "index_hero": "588px 532px (2 col) OK",
+    "index_search": "382 273 273 149 (4 col) OK",
+    "location_loc-grid": "270px 864px (sidebar+main) OK",
+    "admin_dash-grid": "230px 906px OK"
+  },
+  "rca of the issue": "Root cause of user complaint 'tassé/écarts bizarres sur mobile': HTML had duplicate `class=` attributes on all dashboard/location container divs (`<div class=\"container\" ... class=\"dash-grid\">`), which browsers parse by keeping only the FIRST occurrence. So `.dash-grid` and `.loc-grid` classes never existed on the DOM elements, and all `@media(max-width:860px){.dash-grid{...}}` rules were dead code. The inline `grid-template-columns:230px 1fr` (or 270px 1fr) forced the desktop 2-column layout to persist on mobile, causing horizontal overflow. Fix: merge the two `class=` attributes into one. Secondary: replace `1fr` with `minmax(0,1fr)` in mobile grid rules to prevent min-content from expanding the grid track."
+}

@@ -46,3 +46,22 @@ table{width:100%;border-collapse:collapse}
 th,td{text-align:left;padding:12px 10px;font-size:14px;border-bottom:1px solid var(--line)}
 th{font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
 .table-wrap{overflow-x:auto}
+
+/* ---- Responsive mobile (conserve le design, adapte l'espace) ---- */
+img{max-width:100%;height:auto}
+@media(max-width:860px){
+  .dash-grid,.loc-grid{grid-template-columns:minmax(0,1fr)!important}
+}
+@media(max-width:768px){
+  .container{padding:0 16px}
+  .hero-grid{grid-template-columns:1fr!important;gap:22px!important}
+  .search-grid{grid-template-columns:1fr!important;gap:10px!important}
+  .search-grid > div[style*="align-items:end"]{align-items:stretch!important}
+}
+@media(max-width:600px){
+  .stack-sm{grid-template-columns:minmax(0,1fr)!important}
+  .btn{padding:11px 18px;font-size:14px}
+  .card{border-radius:16px}
+  .stat{padding:14px}
+  .stat .num{font-size:22px}
+}
