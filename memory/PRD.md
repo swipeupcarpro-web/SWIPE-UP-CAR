@@ -74,6 +74,11 @@ index, location (recherche+filtres+tri), vehicule (fiche+réservation), reservat
 ## Implémenté (session fork — juin 2026, suite 5)
 - **Expérience mobile (design conservé)** : correction responsive complète. Cause racine trouvée : attributs `class=` en double sur les conteneurs dashboard/location → les media queries étaient inertes ; contenu tassé et débordements. Corrigé + règles globales dans `style.css` (repli 1 colonne du héro, des formulaires de recherche, des tableaux de bord, des grilles de specs via `.stack-sm`, `minmax(0,1fr)`, `img{max-width:100%}`). Résultat : 10/10 pages sans débordement horizontal à 390px, desktop 1280px inchangé (iteration_7.json, 100%).
 
+## Implémenté (session fork — juin 2026, suite 6)
+- **Menu mobile ☰** : bouton hamburger (mobile uniquement) dans la barre du haut ouvrant un panneau d'accès rapide (Louer, Entretien, Pneus, Pièces auto, Lavage + Mon espace/Messages/Quitter ou Se connecter). Caché sur desktop (menu classique conservé).
+- **Onglets de compte visibles sur mobile** : correction du bug où les sidebars (client/pro/loueur/admin) avaient `hide-mobile` → onglets invisibles. Désormais barre d'onglets horizontale scrollable (chips) en haut du tableau de bord sur mobile, sidebar verticale sticky conservée sur desktop.
+- Tests : frontend 100% sur les 4 rôles à 390px + non-régression desktop (iteration_8.json).
+
 ## Reste (P0/P1)
 - Migrer les **avis (reviews)** de localStorage vers la base (toujours en local). (P1) — ✅ FAIT (suite 2)
 - Module **Pièces auto** (e-commerce : catalogue, panier, livraison). (P1)
