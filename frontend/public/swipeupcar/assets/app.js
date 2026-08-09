@@ -6,6 +6,9 @@ const uid=p=>p+Math.random().toString(36).slice(2,8).toUpperCase();
 const todayISO=()=>new Date().toISOString().slice(0,10);
 const addDays=(d,n)=>{const x=new Date(d);x.setDate(x.getDate()+n);return x.toISOString().slice(0,10)};
 const daysBetween=(a,b)=>Math.max(1,Math.round((new Date(b)-new Date(a))/864e5));
+function toggleNavMenu(e){ if(e)e.stopPropagation(); const m=document.getElementById('navMenu'); if(m) m.style.display=(m.style.display==='block')?'none':'block'; }
+document.addEventListener('click',e=>{ const m=document.getElementById('navMenu'); if(m&&m.style.display==='block'&&!e.target.closest('#navMenu')&&!e.target.closest('[data-testid=nav-burger]')) m.style.display='none'; });
+
 
 const IMG={
   orange:'https://images.unsplash.com/photo-1763933356125-69476dc6eb5d?w=900&q=80',
@@ -83,15 +86,15 @@ function createBooking({vehicleId,from,to}){ const r=apiSync('/bookings','POST',
 /* ---- UI ---- */
 function initials(u){ return ((u.firstName||'?')[0]+(u.lastName||'')[0]).toUpperCase(); }
 function renderNav(){
-  const u=Session.get(); let right;
+  const u=Session.get(); const space=u?(u.role==='ADMIN'?'admin.html':u.role==='LOUEUR'?'loueur.html':u.role==='PRO'?'pro.html':'compte.html'):'connexion.html'; let right;
   if(!u){ right=`<a href="connexion.html" class="nav-link hide-mobile">Se connecter</a><a href="inscription.html" class="btn btn-red" style="padding:9px 18px" data-testid="nav-signup">S'inscrire</a>`; }
   else{
     const space=u.role==='ADMIN'?'admin.html':u.role==='LOUEUR'?'loueur.html':u.role==='PRO'?'pro.html':'compte.html';
     const nnotif=(DB.get().notifications[u.id]||[]).filter(n=>!n.read).length;
     right=`<a href="messages.html" class="nav-link hide-mobile" data-testid="nav-messages"><i class="fa-regular fa-comment"></i></a>
     <a href="${space}" class="nav-link hide-mobile" style="position:relative"><i class="fa-regular fa-bell"></i>${nnotif?`<span style="position:absolute;top:-2px;right:-8px;background:var(--red);color:#fff;font-size:10px;border-radius:999px;padding:1px 5px">${nnotif}</span>`:''}</a>
-    <a href="${space}" class="chip" data-testid="nav-account"><span style="width:26px;height:26px;border-radius:50%;background:var(--carbon);color:#fff;display:grid;place-items:center;font-size:12px;font-weight:700">${initials(u)}</span>${u.firstName}</a>
-    <button class="btn btn-ghost" style="padding:8px 14px" onclick="logout()" data-testid="nav-logout">Quitter</button>`;
+    <a href="${space}" class="chip hide-mobile" data-testid="nav-account"><span style="width:26px;height:26px;border-radius:50%;background:var(--carbon);color:#fff;display:grid;place-items:center;font-size:12px;font-weight:700">${initials(u)}</span>${u.firstName}</a>
+    <button class="btn btn-ghost hide-mobile" style="padding:8px 14px" onclick="logout()" data-testid="nav-logout">Quitter</button>`;
   }
   const el=document.getElementById('nav'); if(!el) return;
   el.innerHTML=`<div style="position:sticky;top:0;z-index:100;background:rgba(244,237,226,.85);backdrop-filter:blur(12px);border-bottom:1px solid var(--line)">
@@ -104,8 +107,16 @@ function renderNav(){
         <a class="nav-link" href="services.html?s=pieces">Pièces auto</a>
         <a class="nav-link" href="services.html?s=lavage">Lavage</a>
       </nav>
-      <div style="margin-left:auto;display:flex;align-items:center;gap:12px">${right}</div>
-    </div></div>`;
+      <div style="margin-left:auto;display:flex;align-items:center;gap:10px">${right}<button class="btn btn-ghost only-mobile" style="padding:8px 12px;font-size:18px" onclick="toggleNavMenu(event)" data-testid="nav-burger" aria-label="Menu"><i class="fa-solid fa-bars"></i></button></div>
+    </div>
+    <div id="navMenu" style="display:none;border-top:1px solid var(--line);background:var(--cream)"><div class="container" style="padding:8px 20px;display:flex;flex-direction:column">
+      <a class="nav-link" href="location.html" style="padding:13px 4px;border-bottom:1px solid var(--line)"><i class="fa-solid fa-car" style="width:22px;color:var(--red)"></i> Louer une voiture</a>
+      <a class="nav-link" href="services.html?s=entretien" style="padding:13px 4px;border-bottom:1px solid var(--line)"><i class="fa-solid fa-wrench" style="width:22px;color:var(--red)"></i> Entretien</a>
+      <a class="nav-link" href="services.html?s=pneus" style="padding:13px 4px;border-bottom:1px solid var(--line)"><i class="fa-solid fa-circle-notch" style="width:22px;color:var(--red)"></i> Pneus</a>
+      <a class="nav-link" href="services.html?s=pieces" style="padding:13px 4px;border-bottom:1px solid var(--line)"><i class="fa-solid fa-gears" style="width:22px;color:var(--red)"></i> Pièces auto</a>
+      <a class="nav-link" href="services.html?s=lavage" style="padding:13px 4px;${u?'border-bottom:1px solid var(--line)':''}"><i class="fa-solid fa-soap" style="width:22px;color:var(--red)"></i> Lavage</a>
+      ${u?`<a class="nav-link" href="${space}" style="padding:13px 4px;border-bottom:1px solid var(--line)"><i class="fa-regular fa-user" style="width:22px;color:var(--red)"></i> Mon espace</a><a class="nav-link" href="messages.html" style="padding:13px 4px;border-bottom:1px solid var(--line)"><i class="fa-regular fa-comment" style="width:22px;color:var(--red)"></i> Messages</a><button class="nav-link" onclick="logout()" style="padding:13px 4px;background:none;border:none;text-align:left;color:var(--red);cursor:pointer;font-size:14px"><i class="fa-solid fa-right-from-bracket" style="width:22px"></i> Quitter</button>`:`<a class="nav-link" href="connexion.html" style="padding:13px 4px"><i class="fa-solid fa-right-to-bracket" style="width:22px;color:var(--red)"></i> Se connecter</a>`}
+    </div></div></div>`;
 }
 function renderFooter(){
   const el=document.getElementById('footer'); if(!el) return;
