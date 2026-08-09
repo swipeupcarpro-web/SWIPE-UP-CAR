@@ -12,6 +12,7 @@
     <a data-t="vehicles"><i class="fa-solid fa-car"></i> Véhicules</a>
     <a data-t="bookings"><i class="fa-solid fa-calendar-check"></i> Réservations</a>
     <a data-t="rdv"><i class="fa-regular fa-calendar-check"></i> Rendez-vous</a>
+    <a data-t="moderation"><i class="fa-solid fa-flag"></i> Modération avis</a>
     <a data-t="commissions"><i class="fa-solid fa-percent"></i> Commissions</a>
     <a data-t="settings"><i class="fa-solid fa-gear"></i> Paramètres</a>
   </aside>
@@ -49,6 +50,16 @@ if(u){
   } else if(t==='providers'){
     const ps=(STATE.admin&&STATE.admin.providers)||[];
     M.innerHTML=head('Prestataires (services / RDV)')+tbl(['Entreprise','Type','Ville','Prestations','Statut','Actions'],ps.map(x=>[x.company||x.firstName,x.proType,x.city||'—',(x.services||[]).length,chip(x.proStatus||'Validé'),`${x.proStatus!=='Validé'?`<button class="btn btn-red" style="padding:5px 10px;font-size:13px" onclick="valid('${x.id}')">Valider</button> `:''}<button class="btn btn-ghost" style="padding:5px 10px;font-size:13px" onclick="refuseO('${x.id}')">Refuser</button>`]));
+  } else if(t==='moderation'){
+    const rr=apiSync('/admin/reviews/reported');const list=Array.isArray(rr)?rr:[];
+    M.innerHTML=head('Modération des avis signalés')+tbl(['Client','Véhicule','Note','Avis','Motif(s)','Actions'],list.map(r=>[
+      (r.clientName||'Client'),
+      (r.vehicleTitle||'—'),
+      '★'.repeat(r.rating)+'☆'.repeat(5-r.rating),
+      `<div style="max-width:260px">${((r.text||'—')+'').replace(/</g,'&lt;')}</div>`,
+      `<div style="max-width:200px;color:var(--red);font-size:13px">${(r.reports||[]).map(x=>(x.reason||'—').replace(/</g,'&lt;')).join('<br>')||'—'}</div>`,
+      `<button class="btn btn-red" style="padding:5px 10px;font-size:13px" onclick="delReview('${r.id}')" data-testid="del-review-${r.id}">Supprimer</button> <button class="btn btn-ghost" style="padding:5px 10px;font-size:13px" onclick="dismissReview('${r.id}')" data-testid="dismiss-review-${r.id}">Ignorer</button>`
+    ]));
   } else if(t==='rdv'){
     const ap=(STATE.admin&&STATE.admin.appointments)||[];
     M.innerHTML=head('Rendez-vous (services)')+tbl(['Réf','Type','Prestation','Prestataire','Client','Date','Statut'],ap.map(a=>[a.ref,a.proType,a.serviceName,a.providerName,a.clientName,new Date(a.date).toLocaleDateString('fr-FR')+' '+a.time,chip(a.status)]));
@@ -75,6 +86,8 @@ if(u){
  window.approveV=id=>{const r=apiSync('/admin/vehicles/'+id+'/approve','POST');if(r.error){toast(r.error);return}loadState();toast('Véhicule approuvé — email envoyé');document.querySelector('[data-t=vehicles]').click()};
  window.rejectV=id=>{const reason=prompt('Raison du refus :','Photos non conformes');if(!reason)return;const r=apiSync('/admin/vehicles/'+id+'/reject','POST',{reason});if(r.error){toast(r.error);return}loadState();toast('Véhicule refusé');document.querySelector('[data-t=vehicles]').click()};
  window.suspend=id=>{toast('Suspension : action enregistrée')};
+ window.delReview=id=>{if(!confirm('Supprimer définitivement cet avis ?'))return;const r=apiSync('/admin/reviews/'+id+'/delete','POST');if(r&&r.error){toast(r.error);return}toast('Avis supprimé');document.querySelector('[data-t=moderation]').click()};
+ window.dismissReview=id=>{const r=apiSync('/admin/reviews/'+id+'/dismiss','POST');if(r&&r.error){toast(r.error);return}toast('Signalement ignoré');document.querySelector('[data-t=moderation]').click()};
  window.saveComm=()=>{STATE.settings.commission=(+document.getElementById('commRate').value)/100;toast('Taux mis à jour (appliqué aux futures réservations)')};
  window.refundBk=(ref)=>{if(!confirm('Rembourser les frais de réservation (5%) au client ?'))return;const r=apiSync('/admin/bookings/'+ref+'/refund','POST');if(r.error){toast(r.error);return}SUC_refresh();toast('Remboursement effectué');document.querySelector('[data-t=bookings]').click()};
  render('dash');

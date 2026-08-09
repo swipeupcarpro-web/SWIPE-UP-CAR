@@ -47,6 +47,23 @@
 
 <!-- Categories -->
 <section class="container" style="padding:40px 20px 10px">
+  <div class="card" style="padding:28px;background:var(--carbon);color:#fff;border:none">
+    <div style="display:flex;justify-content:space-between;align-items:end;flex-wrap:wrap;gap:16px">
+      <div>
+        <h2 style="color:#fff;font-size:26px;margin:0"><i class="fa-solid fa-location-crosshairs" style="color:var(--red)"></i> Trouvez un pro près de chez vous</h2>
+        <p style="color:#cfc6b8;margin:8px 0 0;max-width:520px">Garages, pneus, lavage et vendeurs de pièces auto — filtrés par secteur, dans un rayon autour de votre ville.</p>
+      </div>
+    </div>
+    <form id="proSearch" style="display:grid;grid-template-columns:1.4fr 1fr auto;gap:12px;margin-top:18px" class="search-grid">
+      <input class="input" name="city" placeholder="Votre ville (ex : Lyon)" data-testid="pro-search-city">
+      <select class="input" name="cat" data-testid="pro-search-cat"><option value="entretien">🔧 Entretien</option><option value="pneus">🛞 Pneus</option><option value="lavage">🧽 Lavage</option><option value="pieces">🧩 Pièces auto</option></select>
+      <button class="btn btn-red" style="height:46px" data-testid="pro-search-submit"><i class="fa-solid fa-magnifying-glass"></i> Trouver un pro</button>
+    </form>
+  </div>
+</section>
+
+<!-- Categories -->
+<section class="container" style="padding:40px 20px 10px">
   <h2 style="font-size:28px">Découvrez nos catégories</h2>
   <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin-top:18px" id="cats"></div>
 </section>
@@ -82,4 +99,5 @@ const feat=DB.get().vehicles.filter(v=>v.status==='approved').sort((a,b)=>b.rati
 document.getElementById('featured').innerHTML=feat.map(vehicleCard).join('');
 document.querySelectorAll('#tabs button').forEach(b=>b.onclick=()=>{if(b.dataset.tab==='soon'){location.href='services.html'}});
 document.getElementById('searchForm').onsubmit=e=>{e.preventDefault();const f=new FormData(e.target);const q=new URLSearchParams();['where','from','to'].forEach(k=>{if(f.get(k))q.set(k,f.get(k))});location.href='location.html?'+q};
+document.getElementById('proSearch').onsubmit=e=>{e.preventDefault();const f=new FormData(e.target);const q=new URLSearchParams();q.set('s',f.get('cat')||'entretien');if(f.get('city'))q.set('zone',f.get('city'));location.href='services.html?'+q};
 </script></body></html>

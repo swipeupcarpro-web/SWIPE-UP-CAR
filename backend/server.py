@@ -672,10 +672,47 @@ async def reply_review(rid: str, data: ReplyIn, u=Depends(current_user)):
     await db.reviews.update_one({"_id": r["_id"]}, {"$set": {"ownerReply": reply, "ownerReplyDate": datetime.now(timezone.utc).isoformat()}})
     return {"ok": True, "ownerReply": reply}
 
+class ReportIn(BaseModel):
+    reason: str = ""
+
+@api.post("/reviews/{rid}/report")
+async def report_review(rid: str, data: ReportIn, u=Depends(current_user)):
+    r = await db.reviews.find_one({"_id": oid(rid)})
+    if not r: raise HTTPException(404, "Avis introuvable.")
+    entry = {"by": str(u["_id"]), "reason": (data.reason or "").strip()[:300], "date": datetime.now(timezone.utc).isoformat()}
+    await db.reviews.update_one({"_id": r["_id"]}, {"$set": {"reported": True}, "$push": {"reports": entry}})
+    return {"ok": True}
+
 # ---------- admin ----------
 async def require_admin(u=Depends(current_user)):
     if u["role"] != "ADMIN": raise HTTPException(403, "Réservé à l'administration")
     return u
+
+@api.get("/admin/reviews/reported")
+async def admin_reported_reviews(u=Depends(require_admin)):
+    revs = await db.reviews.find({"reported": True}).sort("createdAt", -1).to_list(500)
+    out = []
+    for r in revs:
+        v = await db.vehicles.find_one({"_id": oid(r["vehicleId"])}) if r.get("vehicleId") else None
+        r["id"] = str(r.pop("_id"))
+        r["vehicleTitle"] = (f"{v.get('brand','')} {v.get('model','')}".strip()) if v else r.get("vehicleTitle", "")
+        out.append(r)
+    return out
+
+@api.post("/admin/reviews/{rid}/dismiss")
+async def admin_dismiss_review(rid: str, u=Depends(require_admin)):
+    r = await db.reviews.find_one({"_id": oid(rid)})
+    if not r: raise HTTPException(404, "Avis introuvable.")
+    await db.reviews.update_one({"_id": r["_id"]}, {"$set": {"reported": False, "reports": []}})
+    return {"ok": True}
+
+@api.post("/admin/reviews/{rid}/delete")
+async def admin_delete_review(rid: str, u=Depends(require_admin)):
+    r = await db.reviews.find_one({"_id": oid(rid)})
+    if not r: raise HTTPException(404, "Avis introuvable.")
+    await db.reviews.delete_one({"_id": r["_id"]})
+    await recompute_vehicle_rating(r["vehicleId"])
+    return {"ok": True}
 
 @api.post("/admin/bookings/{ref}/refund")
 async def refund_booking(ref: str, u=Depends(require_admin)):
