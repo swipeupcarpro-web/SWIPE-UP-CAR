@@ -679,6 +679,9 @@ class ReportIn(BaseModel):
 async def report_review(rid: str, data: ReportIn, u=Depends(current_user)):
     r = await db.reviews.find_one({"_id": oid(rid)})
     if not r: raise HTTPException(404, "Avis introuvable.")
+    if any(x.get("by") == str(u["_id"]) for x in r.get("reports", [])):
+        await db.reviews.update_one({"_id": r["_id"]}, {"$set": {"reported": True}})
+        return {"ok": True, "already": True}
     entry = {"by": str(u["_id"]), "reason": (data.reason or "").strip()[:300], "date": datetime.now(timezone.utc).isoformat()}
     await db.reviews.update_one({"_id": r["_id"]}, {"$set": {"reported": True}, "$push": {"reports": entry}})
     return {"ok": True}

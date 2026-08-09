@@ -66,6 +66,11 @@ index, location (recherche+filtres+tri), vehicule (fiche+réservation), reservat
 - **Réponse du loueur aux avis** : `GET /api/reviews/owner/mine`, `POST /api/reviews/{rid}/reply` (contrôle propriété véhicule, réponse non vide). Le loueur répond depuis loueur.html onglet « Avis » ; la réponse s'affiche publiquement sur la fiche véhicule.
 - Nettoyage des données de test résiduelles. Tests : 54/54 pytest backend + frontend 100% (iteration_4.json).
 
+## Implémenté (session fork — juin 2026, suite 4)
+- **Signalement d'avis + modération admin** : bouton « Signaler » sur chaque avis (fiche véhicule), `POST /api/reviews/{rid}/report` (auth, anti-doublon par utilisateur). Nouvel onglet admin « Modération avis » (`GET /api/admin/reviews/reported`) avec actions Supprimer (`/delete`, recalcule la note) et Ignorer (`/dismiss`).
+- **Encart accueil « Trouvez un pro près de chez vous »** : sur index.html, champ ville + catégorie (entretien/pneus/lavage/pièces) redirigeant vers `services.html?s=<cat>&zone=<ville>`.
+- Tests : 66/66 pytest backend + frontend 100% (iteration_5.json).
+
 ## Reste (P0/P1)
 - Migrer les **avis (reviews)** de localStorage vers la base (toujours en local). (P1) — ✅ FAIT (suite 2)
 - Module **Pièces auto** (e-commerce : catalogue, panier, livraison). (P1)
