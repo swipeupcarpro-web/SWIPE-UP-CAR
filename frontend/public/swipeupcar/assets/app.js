@@ -63,13 +63,13 @@ const DB={
 /* ---- Auth ---- */
 const Session={ get(){return STATE.session}, clear(){localStorage.removeItem('suc_token');STATE.session=null} };
 function login(email,pw){ const r=apiSync('/auth/login','POST',{email,password:pw}); if(r.error) return null; localStorage.setItem('suc_token',r.token); loadState(); return STATE.session; }
-function register(data){ const r=apiSync('/auth/register','POST',data); if(r.error) return {err:r.error}; localStorage.setItem('suc_token',r.token); loadState(); return {user:STATE.session}; }
+function register(data){ data.origin_url=window.location.origin; const r=apiSync('/auth/register','POST',data); if(r.error) return {err:r.error}; localStorage.setItem('suc_token',r.token); loadState(); return {user:STATE.session}; }
 function logout(){ Session.clear(); localStorage.removeItem('suc_local'); location.href='index.html'; }
 function resetDemo(){ localStorage.removeItem('suc_local'); toast('Cache local réinitialisé'); setTimeout(()=>location.reload(),600); }
 
 /* ---- Favorites / notifications (local) ---- */
-function toggleFav(vid){ const u=Session.get(); if(!u){toast('Connectez-vous pour ajouter aux favoris');return false;} const db=DB.get(); db.favorites[u.id]=db.favorites[u.id]||[]; const i=db.favorites[u.id].indexOf(vid); let added; if(i>-1){db.favorites[u.id].splice(i,1);added=false;}else{db.favorites[u.id].push(vid);added=true;} DB.set(db); toast(added?'Ajouté aux favoris ♥':'Retiré des favoris'); return added; }
-function isFav(vid){ const u=Session.get(); if(!u) return false; return (DB.get().favorites[u.id]||[]).includes(vid); }
+function toggleFav(vid){const u=Session.get();if(!u){toast('Connectez-vous pour ajouter aux favoris');return false;}const r=apiSync('/favorites/'+vid,'POST');if(r.error){toast('Erreur');return false;}STATE.session.favorites=STATE.session.favorites||[];if(r.favorited){if(!STATE.session.favorites.includes(vid))STATE.session.favorites.push(vid);}else{STATE.session.favorites=STATE.session.favorites.filter(x=>x!==vid);}toast(r.favorited?'Ajouté aux favoris ♥':'Retiré des favoris');return r.favorited;}
+function isFav(vid){const u=Session.get();if(!u)return false;return (u.favorites||[]).includes(vid);}
 function notify(userId,text){ const db=DB.get(); db.notifications[userId]=db.notifications[userId]||[]; db.notifications[userId].unshift({id:uid('N'),text,date:new Date().toISOString(),read:false}); DB.set(db); }
 
 /* ---- Messaging anti-bypass filter ---- */

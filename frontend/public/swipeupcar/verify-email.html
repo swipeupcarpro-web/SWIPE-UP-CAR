@@ -1,0 +1,18 @@
+<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Confirmation email | SWIPEUPCAR</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"><link rel="stylesheet" href="assets/style.css"></head>
+<body><div id="nav"></div>
+<div class="container" style="padding:60px 20px;max-width:520px;text-align:center" id="page">…</div>
+<div id="footer"></div>
+<script src="assets/app.js"></script>
+<script>
+const token=new URLSearchParams(location.search).get('token');
+const r=token?apiSync('/auth/verify?token='+token):{ok:false};
+const ok=r&&r.ok;
+document.getElementById('page').innerHTML=`<div style="width:76px;height:76px;border-radius:50%;background:${ok?'#E8F5E9':'#FDEAEA'};color:${ok?'var(--green)':'var(--red)'};display:grid;place-items:center;font-size:36px;margin:0 auto"><i class="fa-solid ${ok?'fa-check':'fa-xmark'}"></i></div>
+<h1 style="font-size:26px;margin-top:16px">${ok?'Email confirmé ✅':'Lien invalide ou expiré'}</h1>
+<p style="color:var(--muted)">${ok?'Merci ! Votre adresse email est vérifiée.':'Reconnectez-vous puis renvoyez l\\'email de confirmation depuis votre espace.'}</p>
+<a href="${ok?'compte.html':'connexion.html'}" class="btn btn-red" style="margin-top:12px">${ok?'Mon espace':'Se connecter'}</a>`;
+if(ok&&Session.get()){SUC_refresh();}
+</script></body></html>

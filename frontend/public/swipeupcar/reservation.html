@@ -19,10 +19,10 @@ document.getElementById('page').innerHTML=`
  <div class="card" style="padding:22px">
   <h3 style="margin-top:0">Paiement sécurisé</h3>
   <div class="chip" style="background:#fff"><i class="fa-brands fa-cc-stripe" style="color:#635bff"></i> Traité via Stripe Connect (mode test)</div>
-  <p style="color:var(--muted);font-size:13px;margin-top:8px">Paiement réel via <b>Stripe Connect</b> (mode test) : le client paie, SWIPEUPCAR prélève 5% et reverse automatiquement le reste au loueur connecté.</p>
+  <p style="color:var(--muted);font-size:13px;margin-top:8px">Vous payez uniquement les <b>frais de réservation (5%)</b> à SWIPEUPCAR. Le <b>prix de la location</b> et la <b>caution</b> se règlent directement avec le loueur selon ses conditions.</p>
   <form id="payForm" style="margin-top:16px">
     <div style="display:flex;align-items:center;gap:10px;padding:14px;border:1px solid var(--line);border-radius:12px;background:#fff"><i class="fa-brands fa-cc-stripe" style="color:#635bff;font-size:26px"></i><div style="font-size:14px">Vous allez être redirigé vers <b>Stripe</b> pour un paiement 100% sécurisé.</div></div>
-    <button class="btn btn-red" style="width:100%;margin-top:16px" id="payBtn" data-testid="pay-submit"><i class="fa-solid fa-lock"></i> Payer ${money(tot)} via Stripe</button>
+    <button class="btn btn-red" style="width:100%;margin-top:16px" id="payBtn" data-testid="pay-submit"><i class="fa-solid fa-lock"></i> Payer les frais de réservation ${money(comm)}</button>
     <p style="color:var(--muted);font-size:12px;text-align:center;margin-top:10px">Mode test — carte : 4242 4242 4242 4242, date future, CVC quelconque.</p>
   </form>
  </div>
@@ -33,9 +33,9 @@ document.getElementById('page').innerHTML=`
    <div style="margin-top:14px;font-size:14px">
     <div style="display:flex;justify-content:space-between;padding:4px 0"><span>Départ</span><b>${new Date(from).toLocaleDateString('fr-FR')}</b></div>
     <div style="display:flex;justify-content:space-between;padding:4px 0"><span>Retour</span><b>${new Date(to).toLocaleDateString('fr-FR')}</b></div>
-    <div style="display:flex;justify-content:space-between;padding:4px 0"><span>${v.price} € × ${d} j</span><b>${money(tot)}</b></div>
-    <div style="display:flex;justify-content:space-between;padding:4px 0;color:var(--muted)"><span>Commission SWIPEUPCAR (5%)</span><span>${money(comm)}</span></div>
-    <div style="display:flex;justify-content:space-between;padding:10px 0;border-top:1px solid var(--line);margin-top:6px;font-size:18px"><b>Total à payer</b><b>${money(tot)}</b></div>
+    <div style="display:flex;justify-content:space-between;padding:4px 0;color:var(--muted)"><span>Location (${v.price} €×${d}j) — au loueur</span><span>${money(tot)}</span></div>
+    <div style="display:flex;justify-content:space-between;padding:4px 0;color:var(--muted)"><span>Caution — au loueur</span><span>${money(v.deposit||0)}</span></div>
+    <div style="display:flex;justify-content:space-between;padding:10px 0;border-top:1px solid var(--line);margin-top:6px;font-size:18px"><b>Frais de réservation (5%) — à payer</b><b>${money(comm)}</b></div>
    </div>
  </div></div>
 </div>`;

@@ -76,6 +76,7 @@ if(u){
  window.rejectV=id=>{const reason=prompt('Raison du refus :','Photos non conformes');if(!reason)return;const r=apiSync('/admin/vehicles/'+id+'/reject','POST',{reason});if(r.error){toast(r.error);return}loadState();toast('Véhicule refusé');document.querySelector('[data-t=vehicles]').click()};
  window.suspend=id=>{toast('Suspension : action enregistrée')};
  window.saveComm=()=>{STATE.settings.commission=(+document.getElementById('commRate').value)/100;toast('Taux mis à jour (appliqué aux futures réservations)')};
+ window.refundBk=(ref)=>{if(!confirm('Rembourser les frais de réservation (5%) au client ?'))return;const r=apiSync('/admin/bookings/'+ref+'/refund','POST');if(r.error){toast(r.error);return}SUC_refresh();toast('Remboursement effectué');document.querySelector('[data-t=bookings]').click()};
  render('dash');
 }
 </script>

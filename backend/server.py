@@ -103,7 +103,7 @@ class RegisterIn(BaseModel):
     firstName: str; lastName: str = ""; email: EmailStr; password: str
     phone: str = ""; role: str = "PARTICULIER"
     company: Optional[str] = None; siret: Optional[str] = None; iban: Optional[str] = None
-    proType: Optional[str] = None; city: Optional[str] = None
+    proType: Optional[str] = None; city: Optional[str] = None; origin_url: Optional[str] = None
 SERVICE_TYPES = {"GARAGE", "PNEUMATIQUE", "LAVAGE"}
 class ServiceIn(BaseModel):
     name: str; price: float = 0; duration: str = ""
@@ -144,11 +144,14 @@ async def register(data: RegisterIn):
                     "city": data.city or "", "lat": 46.6, "lng": 2.2, "description": "",
                     "proStatus": "En vérification", "rating": 0, "jobs": 0,
                     "since": str(datetime.now().year), "services": []})
+    token = uuid.uuid4().hex
+    doc["verify_token"] = token; doc["site_origin"] = data.origin_url or ""
     res = await db.users.insert_one(doc)
     doc["_id"] = res.inserted_id
-    await send_email(email, "Bienvenue sur SWIPEUPCAR",
-        mail_tpl("Compte créé 🎉", f"Bonjour {data.firstName}, votre compte SWIPEUPCAR est actif." + (
-            " Votre dossier professionnel est en cours de vérification par notre équipe." if role in ("LOUEUR","PRO") else "")))
+    proline = " Votre dossier professionnel est en cours de vérification par notre équipe." if role in ("LOUEUR","PRO") else ""
+    vlink = f"{data.origin_url}/swipeupcar/verify-email.html?token={token}" if data.origin_url else ""
+    await send_email(email, "Confirmez votre email — SWIPEUPCAR",
+        mail_tpl("Bienvenue 🎉", f"Bonjour {data.firstName}, bienvenue sur SWIPEUPCAR.{proline}" + (f"<br><br>Confirmez votre email :<br><a href='{vlink}' style='display:inline-block;background:#B71C1C;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;margin-top:8px'>Confirmer mon email</a>" if vlink else "")))
     if role in ("LOUEUR", "PRO"):
         admin = await db.users.find_one({"role": "ADMIN"})
         if admin: await send_email(admin["email"], "Nouveau professionnel à valider", mail_tpl("Pro en attente", f"{data.company or data.firstName} ({role}) vient de s'inscrire."))
@@ -419,27 +422,17 @@ async def checkout_booking(data: BookingCheckoutIn, u=Depends(current_user)):
         "$nor": [{"to": {"$lte": data.frm}}, {"frm": {"$gte": data.to}}]})
     if clash: raise HTTPException(409, "Ces dates ne sont plus disponibles.")
     days = days_between(data.frm, data.to)
-    total = round(days * v["price"]); commission = round(total * COMMISSION)
-    owner = await db.users.find_one({"_id": oid(v["owner"])})
-    pi_data = {}
-    if owner and owner.get("stripe_account_id"):
-        try:
-            acc = stripe.Account.retrieve(owner["stripe_account_id"])
-            if acc.charges_enabled:
-                pi_data = {"application_fee_amount": commission * 100, "transfer_data": {"destination": owner["stripe_account_id"]}}
-        except Exception:
-            pi_data = {}
-    kwargs = dict(mode="payment",
-        line_items=[{"price_data": {"currency": "eur", "unit_amount": total * 100,
-            "product_data": {"name": f"Location {v['brand']} {v['model']}", "description": f"{data.frm} → {data.to} ({days} j)"}}, "quantity": 1}],
+    total = round(days * v["price"]); fee = max(1, round(total * COMMISSION))
+    session = stripe.checkout.Session.create(mode="payment",
+        line_items=[{"price_data": {"currency": "eur", "unit_amount": fee * 100,
+            "product_data": {"name": f"Frais de réservation SWIPEUPCAR — {v['brand']} {v['model']}",
+                "description": f"Frais de réservation (5% de {total} €). La location et la caution se règlent directement avec le loueur."}}, "quantity": 1}],
         success_url=f"{data.origin_url}/swipeupcar/payment-success.html?session_id={{CHECKOUT_SESSION_ID}}",
         cancel_url=f"{data.origin_url}/swipeupcar/payment-cancel.html",
         metadata={"kind": "booking", "userId": str(u["_id"]), "vehicleId": data.vehicleId})
-    if pi_data: kwargs["payment_intent_data"] = pi_data
-    session = stripe.checkout.Session.create(**kwargs)
     await db.payment_transactions.insert_one({"session_id": session.id, "userId": str(u["_id"]),
         "vehicleId": data.vehicleId, "frm": data.frm, "to": data.to, "total": total,
-        "commission": commission, "ownerAmount": total - commission, "ownerId": v["owner"],
+        "commission": fee, "ownerAmount": total - fee, "ownerId": v["owner"], "fee": fee,
         "status": "initiated", "payment_status": "pending", "created_at": datetime.now(timezone.utc).isoformat()})
     return {"checkout_url": session.url, "session_id": session.id}
 
@@ -461,8 +454,8 @@ async def _finalize_booking(session_id):
     await db.bookings.insert_one(doc)
     await db.payment_transactions.update_one({"session_id": session_id}, {"$set": {"status": "completed", "payment_status": "paid", "booking_ref": ref}})
     await db.users.update_one({"_id": oid(tx["ownerId"])}, {"$inc": {"rentals": 1}})
-    if cu and v: await send_email(cu["email"], f"Réservation confirmée — {ref}", mail_tpl("Réservation confirmée ✅", f"Paiement reçu. <b>{v['brand']} {v['model']}</b> du {tx['frm']} au {tx['to']}.<br>Total {tx['total']} € (commission 5% : {tx['commission']} €).<br>Référence : <b>{ref}</b>"))
-    if owner and v: await send_email(owner["email"], f"Nouvelle réservation — {ref}", mail_tpl("Nouvelle réservation 🚗", f"<b>{v['brand']} {v['model']}</b>. Net (95%) : <b>{tx['ownerAmount']} €</b>." + ("" if owner.get("stripe_account_id") else "<br>⚠️ Connectez votre compte Stripe (Espace loueur → Revenus) pour recevoir vos reversements automatiquement.")))
+    if cu and v: await send_email(cu["email"], f"Réservation confirmée — {ref}", mail_tpl("Réservation confirmée ✅", f"Vos <b>frais de réservation (5%) de {tx['commission']} €</b> sont payés à SWIPEUPCAR.<br><b>{v['brand']} {v['model']}</b> • {tx['frm']} → {tx['to']}.<br><br>⚠️ Le <b>prix de la location ({tx['total']} €)</b> et la <b>caution</b> se règlent <b>directement avec le loueur</b> selon ses conditions.<br>Référence : <b>{ref}</b>"))
+    if owner and v: await send_email(owner["email"], f"Nouvelle réservation — {ref}", mail_tpl("Nouvelle réservation 🚗", f"Nouvelle réservation <b>{v['brand']} {v['model']}</b> ({tx['frm']} → {tx['to']}).<br>Le client a réglé les frais de réservation à SWIPEUPCAR.<br><b>Vous encaissez la location ({tx['total']} €) et la caution directement auprès du client.</b>"))
     return tx
 
 @api.get("/payments/status/{session_id}")
@@ -503,10 +496,51 @@ async def reminder_loop():
             logger.error(f"reminder: {e}")
         await asyncio.sleep(6 * 3600)
 
+@api.get("/auth/verify")
+async def verify_email(token: str):
+    u = await db.users.find_one({"verify_token": token})
+    if not u: return {"ok": False}
+    await db.users.update_one({"_id": u["_id"]}, {"$set": {"verified": True}, "$unset": {"verify_token": ""}})
+    return {"ok": True}
+
+@api.post("/auth/resend-verification")
+async def resend_verification(u=Depends(current_user)):
+    if u.get("verified"): return {"ok": True, "already": True}
+    token = u.get("verify_token") or uuid.uuid4().hex
+    await db.users.update_one({"_id": u["_id"]}, {"$set": {"verify_token": token}})
+    origin = u.get("site_origin") or ""
+    link = f"{origin}/swipeupcar/verify-email.html?token={token}" if origin else ""
+    if link: await send_email(u["email"], "Confirmez votre email — SWIPEUPCAR", mail_tpl("Confirmation d'email", f"Cliquez pour confirmer votre email :<br><br><a href='{link}' style='display:inline-block;background:#B71C1C;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none'>Confirmer mon email</a>"))
+    return {"ok": True}
+
+@api.post("/favorites/{vid}")
+async def toggle_favorite(vid: str, u=Depends(current_user)):
+    favs = u.get("favorites", []) or []
+    if vid in favs: favs.remove(vid); added = False
+    else: favs.append(vid); added = True
+    await db.users.update_one({"_id": u["_id"]}, {"$set": {"favorites": favs}})
+    return {"favorited": added}
+
 # ---------- admin ----------
 async def require_admin(u=Depends(current_user)):
     if u["role"] != "ADMIN": raise HTTPException(403, "Réservé à l'administration")
     return u
+
+@api.post("/admin/bookings/{ref}/refund")
+async def refund_booking(ref: str, u=Depends(require_admin)):
+    b = await db.bookings.find_one({"ref": ref})
+    if not b: raise HTTPException(404)
+    tx = await db.payment_transactions.find_one({"booking_ref": ref})
+    if tx:
+        try:
+            s = stripe.checkout.Session.retrieve(tx["session_id"])
+            if s.payment_intent: stripe.Refund.create(payment_intent=s.payment_intent)
+        except Exception as e:
+            raise HTTPException(400, f"Remboursement Stripe échoué : {e}")
+    await db.bookings.update_one({"ref": ref}, {"$set": {"status": "refunded"}})
+    cu = await db.users.find_one({"_id": oid(b["userId"])})
+    if cu: await send_email(cu["email"], f"Frais de réservation remboursés — {ref}", mail_tpl("Remboursement effectué", f"Vos frais de réservation de {b.get('commission',0)} € ont été remboursés (réf {ref})."))
+    return {"ok": True}
 
 @api.get("/admin/overview")
 async def admin_overview(u=Depends(require_admin)):
@@ -581,7 +615,7 @@ async def startup():
         if ex: return str(ex["_id"])
         doc["email"] = email; doc["password_hash"] = hash_pw(pw)
         r = await db.users.insert_one(doc); return str(r.inserted_id)
-    l1 = await ensure_user("loueur@swipeupcar.fr", "loueur123", {"firstName":"Thomas","lastName":"Martin","role":"LOUEUR","verified":True,"proStatus":"Validé","siret":"81234567800012","company":"Martin Auto Location","rating":4.9,"rentals":118,"since":"2023","satisfaction":98})
+    l1 = await ensure_user("swipeupcar.pro@gmail.com", "loueur123", {"firstName":"Thomas","lastName":"Martin","role":"LOUEUR","verified":True,"proStatus":"Validé","siret":"81234567800012","company":"Martin Auto Location","rating":4.9,"rentals":118,"since":"2023","satisfaction":98})
     l2 = await ensure_user("sophie@swipeupcar.fr", "loueur123", {"firstName":"Sophie","lastName":"Durand","role":"LOUEUR","verified":True,"proStatus":"Validé","siret":"75234567800045","company":"Durand Mobilité","rating":4.7,"rentals":64,"since":"2024","satisfaction":95})
     await ensure_user("client@swipeupcar.fr", "client123", {"firstName":"Julie","lastName":"Bernard","role":"PARTICULIER","verified":True,"phone":"0600000000"})
     if await db.vehicles.count_documents({}) == 0:

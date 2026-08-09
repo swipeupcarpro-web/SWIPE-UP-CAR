@@ -15,8 +15,8 @@ document.getElementById('page').innerHTML=b?`
   <p style="color:var(--muted)">Référence <b>${b.ref}</b> — un email de confirmation vous a été envoyé.</p>
   <div class="card" style="padding:18px;margin-top:20px;text-align:left">
     <div style="display:flex;gap:14px;align-items:center"><img src="${v.images[0]}" style="width:96px;height:64px;object-fit:cover;border-radius:10px"><div><b>${v.brand} ${v.model}</b><div style="color:var(--muted);font-size:14px">${new Date(b.from).toLocaleDateString('fr-FR')} → ${new Date(b.to).toLocaleDateString('fr-FR')} • ${b.days} jour(s)</div></div></div>
-    <div style="display:flex;justify-content:space-between;margin-top:14px;padding-top:12px;border-top:1px solid var(--line)"><span>Montant payé</span><b>${money(b.total)}</b></div>
-    <div style="display:flex;justify-content:space-between;color:var(--muted);font-size:14px"><span>Commission SWIPEUPCAR (5%)</span><span>${money(b.commission)}</span></div>
+    <div style="display:flex;justify-content:space-between;margin-top:14px;padding-top:12px;border-top:1px solid var(--line)"><span>Frais de réservation payés (5%)</span><b>${money(b.commission)}</b></div>
+    <div style="display:flex;justify-content:space-between;color:var(--muted);font-size:14px"><span>Location + caution (au loueur)</span><span>${money(b.total)}</span></div>
   </div>
   <div style="display:flex;gap:10px;justify-content:center;margin-top:22px;flex-wrap:wrap">
     <a href="compte.html" class="btn btn-red" data-testid="go-account">Voir mes réservations</a>
