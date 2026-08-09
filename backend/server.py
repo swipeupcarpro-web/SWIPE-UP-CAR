@@ -668,6 +668,7 @@ async def reply_review(rid: str, data: ReplyIn, u=Depends(current_user)):
     if not v or (v.get("owner") != str(u["_id"]) and u["role"] != "ADMIN"):
         raise HTTPException(403, "Vous ne pouvez répondre qu'aux avis reçus sur vos véhicules.")
     reply = (data.text or "").strip()[:600]
+    if not reply: raise HTTPException(400, "La réponse ne peut pas être vide.")
     await db.reviews.update_one({"_id": r["_id"]}, {"$set": {"ownerReply": reply, "ownerReplyDate": datetime.now(timezone.utc).isoformat()}})
     return {"ok": True, "ownerReply": reply}
 

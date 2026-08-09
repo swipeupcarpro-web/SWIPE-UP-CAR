@@ -61,6 +61,11 @@ index, location (recherche+filtres+tri), vehicule (fiche+réservation), reservat
 - **Filtre par distance/rayon** sur les services : géocodage de la ville (dictionnaire villes FR + fallback Nominatim), rayon 10/25/50/100 km, tri par distance + badge « à X km ». `GET /api/geocode`. Villes des pros géocodées à l'inscription et à la sauvegarde du profil.
 - Tests : 45/45 pytest backend + frontend 100% (iteration_3.json).
 
+## Implémenté (session fork — juin 2026, suite 3)
+- **Carte des prestataires** : carte Leaflet sur `services.html` (bouton « Afficher la carte »), marqueurs par lat/lng pour garages/pneus/lavage/pièces, popup nom/ville/distance + lien fiche. Se met à jour avec le filtre par rayon.
+- **Réponse du loueur aux avis** : `GET /api/reviews/owner/mine`, `POST /api/reviews/{rid}/reply` (contrôle propriété véhicule, réponse non vide). Le loueur répond depuis loueur.html onglet « Avis » ; la réponse s'affiche publiquement sur la fiche véhicule.
+- Nettoyage des données de test résiduelles. Tests : 54/54 pytest backend + frontend 100% (iteration_4.json).
+
 ## Reste (P0/P1)
 - Migrer les **avis (reviews)** de localStorage vers la base (toujours en local). (P1) — ✅ FAIT (suite 2)
 - Module **Pièces auto** (e-commerce : catalogue, panier, livraison). (P1)
