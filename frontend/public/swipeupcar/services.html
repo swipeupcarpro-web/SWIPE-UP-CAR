@@ -2,7 +2,7 @@
 <title>Services automobiles — Prendre RDV | SWIPEUPCAR</title>
 <meta name="description" content="Prenez rendez-vous avec des professionnels vérifiés : entretien, pneus, lavage — et trouvez des vendeurs de pièces auto près de chez vous, dans un rayon donné. Partout en France.">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"><link rel="stylesheet" href="assets/style.css"></head>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"><script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><link rel="stylesheet" href="assets/style.css"></head>
 <body><div id="nav"></div>
 <div class="container" style="padding:26px 20px" id="page"></div>
 <div id="footer"></div><div id="mnav"></div>
@@ -69,8 +69,10 @@ function renderResults(){
   const cards=filtered.length?filtered.map(p=>isPieces?pieceCard(p):svcCard(p)).join(''):emptyCard(z);
   document.getElementById('results').innerHTML=cards;
   document.getElementById('rescount').textContent=filtered.length+' résultat'+(filtered.length>1?'s':'')+mode;
+  window.__flist=filtered; drawMap(filtered);
 }
-let _t=null;
+let _map,_markers=[],_t=null;
+function drawMap(list){const el=document.getElementById('map');if(!el||el.style.display==='none')return;if(!_map){_map=L.map('map').setView([46.6,2.3],5);L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap',maxZoom:18}).addTo(_map);}_markers.forEach(mk=>_map.removeLayer(mk));_markers=[];const pts=[];list.forEach(p=>{if(p.lat==null)return;const mk=L.marker([p.lat,p.lng]).addTo(_map);const link=isPieces?'':`<br><a href="service.html?id=${p.id}">Voir la fiche</a>`;mk.bindPopup(`<b>${p.company||p.firstName}</b><br>${p.city}${p._dist!=null?' • à '+p._dist+' km':''}${p.phone?'<br>'+p.phone:''}${link}`);_markers.push(mk);pts.push([p.lat,p.lng]);});if(pts.length)_map.fitBounds(pts,{padding:[40,40],maxZoom:12});setTimeout(()=>_map.invalidateSize(),100);}
 document.getElementById('page').innerHTML=`
  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">${tabs}</div>
  <div style="font-size:48px">${m[0]}</div><h1 style="font-size:30px;margin:4px 0">${m[1]}</h1><p style="color:var(--muted);font-size:17px">${m[2]} <b>${isPieces?'Contact direct, sans rendez-vous.':'Prise de RDV en ligne, sans paiement.'}</b></p>
@@ -81,12 +83,15 @@ document.getElementById('page').innerHTML=`
    <button class="btn btn-ghost" id="zoneClear" data-testid="zone-clear"><i class="fa-solid fa-xmark"></i></button>
  </div>
  <div id="rescount" style="color:var(--muted);font-size:14px;margin-top:12px"></div>
+ <div style="display:flex;justify-content:flex-end;margin-top:8px"><button class="btn btn-ghost" id="mapToggle" style="padding:7px 14px;font-size:14px" data-testid="map-toggle"><i class="fa-solid fa-map-location-dot"></i> Afficher la carte</button></div>
+ <div id="map" style="display:none;height:360px;border-radius:16px;margin-top:12px;border:1px solid var(--line);overflow:hidden;z-index:1"></div>
  <div id="results" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:18px;margin-top:10px"></div>
  <div class="card" style="margin-top:24px;padding:20px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px"><span>Vous êtes un professionnel (garage, pneus, lavage, pièces auto) ?</span><a href="devenir-partenaire.html" class="btn btn-dark">Devenir partenaire</a></div>`;
 document.getElementById('zone').addEventListener('input',()=>{if(+document.getElementById('radius').value===0){clearTimeout(_t);_t=setTimeout(renderResults,250);}});
 document.getElementById('zone').addEventListener('keydown',e=>{if(e.key==='Enter')renderResults();});
 document.getElementById('radius').addEventListener('change',renderResults);
 document.getElementById('zoneSearch').onclick=renderResults;
+document.getElementById('mapToggle').onclick=function(){const el=document.getElementById('map');const show=el.style.display==='none';el.style.display=show?'block':'none';this.innerHTML=show?'<i class="fa-solid fa-list"></i> Masquer la carte':'<i class="fa-solid fa-map-location-dot"></i> Afficher la carte';if(show)drawMap(window.__flist||[]);};
 document.getElementById('zoneClear').onclick=()=>{document.getElementById('zone').value='';document.getElementById('radius').value='0';renderResults();};
 renderResults();
 </script>

@@ -647,6 +647,30 @@ async def my_reviews(u=Depends(current_user)):
     for r in revs: r["id"] = str(r.pop("_id"))
     return revs
 
+@api.get("/reviews/owner/mine")
+async def owner_reviews(u=Depends(current_user)):
+    vs = await db.vehicles.find({"owner": str(u["_id"])}).to_list(500)
+    vmap = {str(v["_id"]): (f"{v.get('brand','')} {v.get('model','')}").strip() for v in vs}
+    ids = list(vmap.keys())
+    revs = await db.reviews.find({"vehicleId": {"$in": ids}}).sort("createdAt", -1).to_list(500)
+    for r in revs:
+        r["id"] = str(r.pop("_id")); r["vehicleTitle"] = vmap.get(r["vehicleId"], r.get("vehicleTitle", ""))
+    return revs
+
+class ReplyIn(BaseModel):
+    text: str
+
+@api.post("/reviews/{rid}/reply")
+async def reply_review(rid: str, data: ReplyIn, u=Depends(current_user)):
+    r = await db.reviews.find_one({"_id": oid(rid)})
+    if not r: raise HTTPException(404, "Avis introuvable.")
+    v = await db.vehicles.find_one({"_id": oid(r["vehicleId"])})
+    if not v or (v.get("owner") != str(u["_id"]) and u["role"] != "ADMIN"):
+        raise HTTPException(403, "Vous ne pouvez répondre qu'aux avis reçus sur vos véhicules.")
+    reply = (data.text or "").strip()[:600]
+    await db.reviews.update_one({"_id": r["_id"]}, {"$set": {"ownerReply": reply, "ownerReplyDate": datetime.now(timezone.utc).isoformat()}})
+    return {"ok": True, "ownerReply": reply}
+
 # ---------- admin ----------
 async def require_admin(u=Depends(current_user)):
     if u["role"] != "ADMIN": raise HTTPException(403, "Réservé à l'administration")

@@ -1,0 +1,29 @@
+{
+  "summary": "SWIPEUPCAR iteration 4 — E2E validation of (A) Leaflet map on services.html and (B) loueur reply on reviews. Backend: new /app/backend/tests/test_iter4_owner_reply_and_map.py (9 tests) — 9/9 PASS. Regression: full suite 54/54 PASS. Frontend Playwright: (a) services.html?s=entretien → map-toggle affiche 2 marqueurs (Leaflet), popup avec nom/ville/lien 'Voir la fiche', bouton bascule 'Masquer la carte' → 'Afficher la carte' ; (b) services.html?s=lavage + Bordeaux + rayon 50km → 1 marqueur BullePro Detailing avec popup 'Bordeaux • à 0 km' ; (c) E2E réponse loueur : login sophie@ → loueur.html onglet Avis → data-testid rev-{id} présent, saisie dans #rp-{id}, clic [data-testid=reply-{id}] → toast 'Réponse publiée', encart 'Votre réponse' apparaît, bouton devient 'Modifier la réponse' ; (d) fiche véhicule publique vehicule.html?id={vid} affiche 'Réponse du loueur' avec le texte. Seed booking+review inséré directement en Mongo puis nettoyé après test. Nettoyage aussi de 3 utilisateurs TEST_ leftover d'itérations précédentes (TEST Garage Co, etc.).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_iter4_owner_reply_and_map.py",
+    "/app/backend/tests/test_iter3_reviews_photos_distance.py",
+    "/app/backend/tests/test_swipeupcar.py",
+    "/app/test_reports/pytest/iter4_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py atteint désormais 822 lignes — modularisation encore recommandée (reviews.py serait un candidat naturel avec reply + owner/mine).",
+    "POST /api/reviews/{rid}/reply — pas de validation de longueur minimale du texte (0 caractère accepté silencieusement, sera tronqué à 600). Le frontend gère un 'Écrivez une réponse' côté client mais un guard côté serveur (400 si strip()==\"\" ) serait plus robuste.",
+    "Le champ ownerReplyDate est stocké en ISO string mais pas typé/formaté à la lecture — cohérent avec le reste du code (createdAt idem).",
+    "L'endpoint /api/providers renvoie tous les pros validés — inclut potentiellement TEST_ leftovers si non nettoyés. Envisager un flag hidden ou un filtrage par email pattern côté seed pour éviter pollution en dev."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter4_owner_reply_and_map.py (nouveau, 9 tests)",
+    "/app/scripts/cleanup_iter4.py (nouveau, cleanup helper)"
+  ],
+  "success_rate": {"backend": "100% (9/9 iter4, 54/54 total)", "frontend": "100% (map toggle + markers + popup + Bordeaux/50km filter + owner reply E2E + public vehicule.html display)"},
+  "test_credentials": "sophie@swipeupcar.fr/loueur123 (loueur), client@swipeupcar.fr/client123 (client vérifié). Autres: garage@/pneus@/lavage@/pieces@swipeupcar.fr - pro123 ; swipeupcar.pro@gmail.com/SwipeAdmin@2026",
+  "seed_data_creation": "Test backend E2E seed via Mongo: booking 'TEST-xxxxxx' terminée + review 'TEST_iter4 ...' sur véhicule de Sophie. Nettoyage complet en teardown (fixture + script cleanup_iter4.py). Test UI: 1 booking + 1 review seedés puis supprimés via /app/scripts/cleanup_iter4.py. En prime, 3 utilisateurs 'TEST Garage Co / TEST_*' leftover d'itérations précédentes supprimés.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Iteration 4 SWIPEUPCAR 100% validée. Nouveaux endpoints validés: (1) POST /api/reviews/{rid}/reply — auth requis (401), 403 si non-propriétaire, 200 si owner ou ADMIN, 404 si rid invalide, met à jour ownerReply + ownerReplyDate ; idempotent (peut être appelé plusieurs fois pour éditer). (2) GET /api/reviews/owner/mine — auth requis, retourne les reviews sur les véhicules du loueur avec vehicleTitle repopulé depuis la collection vehicles. (3) GET /api/reviews/vehicle/{vid} — public, inclut ownerReply/ownerReplyDate. Frontend: services.html carte Leaflet OK (data-testid map-toggle) ; loueur.html reviewRow avec textarea rp-{id} + bouton reply-{id} OK ; vehicule.html section 'Réponse du loueur' OK. Base de données nettoyée : aucun TEST_/TEST- restant.",
+  "rca of the issue": "N/A — aucune régression, aucun bug détecté."
+}
