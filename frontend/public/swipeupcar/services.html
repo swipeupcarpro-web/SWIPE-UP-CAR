@@ -1,6 +1,6 @@
 <!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Services automobiles — Prendre RDV | SWIPEUPCAR</title>
-<meta name="description" content="Prenez rendez-vous avec des professionnels vérifiés : entretien, pneus, lavage — et trouvez des vendeurs de pièces auto. Partout en France.">
+<meta name="description" content="Prenez rendez-vous avec des professionnels vérifiés : entretien, pneus, lavage — et trouvez des vendeurs de pièces auto près de chez vous. Partout en France.">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"><link rel="stylesheet" href="assets/style.css"></head>
 <body><div id="nav"></div>
@@ -10,12 +10,15 @@
 <script>
 const MAP={entretien:'GARAGE',pneus:'PNEUMATIQUE',lavage:'LAVAGE',pieces:'PIECES'};
 const META={GARAGE:['🔧','Entretien automobile','Vidange, révision, freins — chez un garage vérifié.'],PNEUMATIQUE:['🛞','Pneus','Montage, équilibrage et géométrie près de chez vous.'],LAVAGE:['🧽','Lavage / detailing','Nettoyage intérieur et extérieur, detailing premium.'],PIECES:['🧩','Pièces auto','Trouvez un vendeur de pièces près de chez vous et contactez-le directement.']};
-const s=new URLSearchParams(location.search).get('s')||'entretien';
+const P=new URLSearchParams(location.search);
+const s=P.get('s')||'entretien';
+const zone0=P.get('zone')||'';
 const type=MAP[s]||'GARAGE'; const m=META[type];
 const isPieces = type==='PIECES';
 const list=apiSync('/providers?type='+type); const arr=Array.isArray(list)?list:[];
-const tabs=Object.entries(MAP).map(([k,v])=>`<a href="services.html?s=${k}" class="chip" style="${k===s?'background:var(--red);color:#fff;border:none':''}">${META[v][0]} ${META[v][1]}</a>`).join(' ');
+const tabs=Object.entries(MAP).map(([k,v])=>`<a href="services.html?s=${k}${zone0?'&zone='+encodeURIComponent(zone0):''}" class="chip" style="${k===s?'background:var(--red);color:#fff;border:none':''}">${META[v][0]} ${META[v][1]}</a>`).join(' ');
 function esc(x){return (x||'').replace(/"/g,'&quot;')}
+function matchZone(p,z){ if(!z)return true; z=z.toLowerCase().trim(); return ((p.city||'')+' '+(p.address||'')).toLowerCase().includes(z); }
 function pieceCard(p){
   const tel=(p.phone||'').replace(/\s/g,'');
   return `<div class="card fade-up" style="padding:18px" data-testid="piece-${p.id}">
@@ -40,11 +43,26 @@ function svcCard(p){
     <a href="service.html?id=${p.id}" class="btn btn-red" style="width:100%;margin-top:14px" data-testid="provider-${p.id}"><i class="fa-regular fa-calendar-check"></i> Prendre RDV</a>
   </div>`;
 }
-const cards = arr.length?arr.map(p=>isPieces?pieceCard(p):svcCard(p)).join(''):`<div class="card" style="padding:40px;text-align:center;color:var(--muted);grid-column:1/-1"><i class="fa-solid fa-store" style="font-size:34px"></i><p>Aucun professionnel dans cette catégorie pour le moment.</p><a href="devenir-partenaire.html" class="btn btn-red">Devenir partenaire</a></div>`;
+function emptyCard(z){return `<div class="card" style="padding:40px;text-align:center;color:var(--muted);grid-column:1/-1"><i class="fa-solid fa-store" style="font-size:34px"></i><p>${z?`Aucun professionnel trouvé pour « ${esc(z)} » dans cette catégorie.`:"Aucun professionnel dans cette catégorie pour le moment."}</p><a href="devenir-partenaire.html" class="btn btn-red">Devenir partenaire</a></div>`;}
+function renderResults(){
+  const z=(document.getElementById('zone').value||'').trim();
+  const filtered=arr.filter(p=>matchZone(p,z));
+  const cards=filtered.length?filtered.map(p=>isPieces?pieceCard(p):svcCard(p)).join(''):emptyCard(z);
+  document.getElementById('results').innerHTML=cards;
+  document.getElementById('rescount').textContent=filtered.length+' résultat'+(filtered.length>1?'s':'')+(z?` • secteur « ${z} »`:'');
+}
 document.getElementById('page').innerHTML=`
  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">${tabs}</div>
  <div style="font-size:48px">${m[0]}</div><h1 style="font-size:30px;margin:4px 0">${m[1]}</h1><p style="color:var(--muted);font-size:17px">${m[2]} <b>${isPieces?'Contact direct, sans rendez-vous.':'Prise de RDV en ligne, sans paiement.'}</b></p>
- <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:18px;margin-top:20px">${cards}</div>
+ <div class="card" style="padding:14px;margin-top:14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+   <div style="flex:1;min-width:220px;position:relative"><i class="fa-solid fa-location-dot" style="position:absolute;left:14px;top:50%;transform:translateY(-50%);color:var(--red)"></i><input class="input" id="zone" placeholder="Votre ville ou secteur (ex : Bordeaux)" value="${esc(zone0)}" style="padding-left:38px" data-testid="zone-search"></div>
+   <button class="btn btn-ghost" id="zoneClear" data-testid="zone-clear"><i class="fa-solid fa-xmark"></i> Effacer</button>
+ </div>
+ <div id="rescount" style="color:var(--muted);font-size:14px;margin-top:12px"></div>
+ <div id="results" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:18px;margin-top:10px"></div>
  <div class="card" style="margin-top:24px;padding:20px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px"><span>Vous êtes un professionnel (garage, pneus, lavage, pièces auto) ?</span><a href="devenir-partenaire.html" class="btn btn-dark">Devenir partenaire</a></div>`;
+document.getElementById('zone').addEventListener('input',renderResults);
+document.getElementById('zoneClear').onclick=()=>{document.getElementById('zone').value='';renderResults();};
+renderResults();
 </script>
 </body></html>

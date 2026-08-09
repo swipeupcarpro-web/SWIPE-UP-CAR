@@ -48,6 +48,13 @@ index, location (recherche+filtres+tri), vehicule (fiche+réservation), reservat
 - **Fix bug** : section Sécurité de infos.html (template literal JS écrit en HTML statique) → cartes rendues correctement.
 - Tests : pytest backend 16/16 + Playwright frontend 100% (iteration_1.json).
 
+## Implémenté (session fork — juin 2026, suite)
+- **Stripe Connect loueur SUPPRIMÉ** : endpoints `/api/stripe/connect/*` retirés (404) + fonctions frontend mortes retirées. Cohérent avec le modèle 5% only (les loueurs n'ont pas besoin de Stripe). Testé 26/26 backend + 32/32 frontend (iteration_2.json).
+- **Module Pièces auto (simple, sans e-commerce)** : nouveau type de pro `PIECES`. Le vendeur publie une annonce avec coordonnées directes (téléphone, adresse, site web) affichées aux clients ; boutons « Appeler » / « Itinéraire ». Pas de panier/paiement/RDV. Annuaire sur `services.html?s=pieces` + fiche `service.html`.
+- **Validation admin obligatoire avant publication** pour TOUS les pros (garage/pneus/lavage/pièces) : `POST /api/providers/service` → 403 tant que `proStatus != "Validé"`. UI pro.html verrouillée + bandeau tant que non validé.
+- **Filtre par zone/ville sur les services** : champ « Votre ville ou secteur » sur `services.html` (filtrage en direct par ville/adresse, comme les locations). Compteur de résultats + conservation du secteur entre onglets.
+- Seed : vendeur de pièces démo `pieces@swipeupcar.fr` (AutoPièces Express, Lille).
+
 ## Reste (P0/P1)
 - Migrer les **avis (reviews)** de localStorage vers la base (toujours en local). (P1)
 - Module **Pièces auto** (e-commerce : catalogue, panier, livraison). (P1)
