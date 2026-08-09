@@ -40,5 +40,17 @@ index, location (recherche+filtres+tri), vehicule (fiche+réservation), reservat
 - RDV avec créneaux : anti double-réservation serveur (409), GET /providers/{id}/availability?date.
 - Confirmation Pro : RDV créé "En attente" → POST /appointments/{id}/{accept|refuse} → "confirmé/refusé" + emails. Dashboard pro (Accepter/Refuser), statuts colorés côté client.
 
-## Reste (P0)
-- Stripe Connect : encaissement réel des locations + reversement auto 95% aux loueurs (nécessite onboarding Stripe de chaque loueur). À faire en passe dédiée.
+## Implémenté (session fork — juin 2026)
+- **Messagerie serveur** : conversations/messages persistés en MongoDB (collection `conversations`), historique multi-appareils, filtre anti-contournement côté serveur (téléphone/email/URL masqués). Endpoints : GET/POST `/api/conversations`, GET `/api/conversations/{id}`, POST `/api/conversations/{id}/messages`. Polling 6s côté client. (localStorage abandonné pour la messagerie.)
+- **Vérification email obligatoire avant réservation** : `/api/bookings` et `/api/payments/checkout/booking` → 403 si email non confirmé. Page réservation affiche un blocage + bouton « Renvoyer l'email ».
+- **Pages légales complètes** : `cgu.html`, `cgv.html`, `confidentialite.html` (RGPD), `mentions-legales.html` (liées depuis footer + infos.html). Aucune mention « à faire valider ». Mentions légales : quelques champs société `[à compléter]` (SIRET/adresse/hébergeur).
+- **Compte officiel/admin** : `swipeupcar.pro@gmail.com` migré de LOUEUR → ADMIN (mdp `SwipeAdmin@2026`). Reçoit les notifications admin. Véhicules de démo réattribués à `sophie@swipeupcar.fr`.
+- **Fix bug** : section Sécurité de infos.html (template literal JS écrit en HTML statique) → cartes rendues correctement.
+- Tests : pytest backend 16/16 + Playwright frontend 100% (iteration_1.json).
+
+## Reste (P0/P1)
+- Migrer les **avis (reviews)** de localStorage vers la base (toujours en local). (P1)
+- Module **Pièces auto** (e-commerce : catalogue, panier, livraison). (P1)
+- Stripe Connect onboarding : gérer l'erreur si le loueur n'a pas finalisé son compte Stripe. (P1) — NB : modèle 5% only, pas de reversement 95%.
+- SMS rappels RDV (P2), modération photo auto (plaques/QR/téléphone) (P2).
+- Compléter les champs société des mentions légales (SIRET, adresse, hébergeur, directeur de publication). (P2)
