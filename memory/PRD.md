@@ -93,3 +93,10 @@ index, location (recherche+filtres+tri), vehicule (fiche+réservation), reservat
 - `connexion.html` récupère /api/config et masque le bloc identifiants de démo si demo_mode=false.
 - Résultat : preview reste une démo (données + identifiants visibles) ; code poussé sur GitHub = base propre sans fausses données ni identifiants.
 - Vérifié : curl /api/config → {"demo_mode":true} en preview ; screenshot connexion → bloc démo visible.
+
+## Modération automatique des photos (IA vision) — 2026-06-09
+- À l'upload (`POST /api/upload`, endpoint unique utilisé par véhicules + galeries prestataires), chaque image est analysée par Gemini vision (`gemini-3-flash-preview`) via EMERGENT_LLM_KEY (emergentintegrations).
+- Détection : numéro de téléphone lisible et/ou plaque d'immatriculation → upload BLOQUÉ (HTTP 400) avec message clair en français.
+- Fail-open : si l'IA échoue/clé absente, l'upload passe (pas de blocage abusif).
+- Frontend : loueur.html (ajout véhicule) et pro.html (galerie prestataire) affichent le message d'erreur via toast et stoppent l'ajout.
+- Vérifié e2e : image plaque+numéro → 400 refusé ; image propre → 200 + URL.

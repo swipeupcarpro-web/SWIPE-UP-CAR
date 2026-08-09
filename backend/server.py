@@ -3,7 +3,7 @@ from pathlib import Path
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
-import os, re, logging, jwt, bcrypt, httpx, asyncio
+import os, re, logging, jwt, bcrypt, httpx, asyncio, base64, json as _json
 from datetime import datetime, timezone, timedelta
 from fastapi import FastAPI, APIRouter, HTTPException, Request, Depends, UploadFile, File, Response
 from starlette.middleware.cors import CORSMiddleware
@@ -210,13 +210,59 @@ async def vehicle_out(v):
         v["ownerSince"] = o.get("since", "2026"); v["ownerSatisfaction"] = o.get("satisfaction", 0)
     return v
 
+EMERGENT_LLM_KEY = os.environ.get("EMERGENT_LLM_KEY")
+
+async def moderate_image(data: bytes, content_type: str):
+    """Détecte un numéro de téléphone ou une plaque d'immatriculation visible sur la photo.
+    Retourne {"phone": bool, "plate": bool}. En cas d'erreur IA, laisse passer (fail-open)."""
+    if not EMERGENT_LLM_KEY:
+        return {"phone": False, "plate": False}
+    try:
+        from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
+        b64 = base64.b64encode(data).decode()
+        chat = LlmChat(
+            api_key=EMERGENT_LLM_KEY,
+            session_id=f"mod-{uuid.uuid4().hex}",
+            system_message=(
+                "Tu es un modérateur d'images pour une marketplace automobile. "
+                "Tu dois détecter uniquement deux choses sur la photo : "
+                "1) un numéro de téléphone lisible (suite de chiffres formant un téléphone), "
+                "2) une plaque d'immatriculation de véhicule lisible. "
+                "Réponds STRICTEMENT en JSON compact, sans texte autour : "
+                '{"phone": true/false, "plate": true/false}. '
+                "phone=true seulement si un numéro de téléphone est clairement lisible. "
+                "plate=true seulement si une plaque d'immatriculation est clairement lisible."
+            ),
+        ).with_model("gemini", "gemini-3-flash-preview")
+        resp = await chat.send_message(UserMessage(
+            text="Analyse cette photo et renvoie le JSON demandé.",
+            file_contents=[ImageContent(image_base64=b64)],
+        ))
+        txt = resp if isinstance(resp, str) else str(resp)
+        m = re.search(r"\{.*\}", txt, re.DOTALL)
+        if m:
+            j = _json.loads(m.group(0))
+            return {"phone": bool(j.get("phone")), "plate": bool(j.get("plate"))}
+    except Exception as e:
+        logger.warning(f"moderate_image failed: {e}")
+    return {"phone": False, "plate": False}
+
 @api.post("/upload")
 async def upload_file(file: UploadFile = File(...), u=Depends(current_user)):
     ext = (file.filename.rsplit(".", 1)[-1] if "." in (file.filename or "") else "bin").lower()
     data = await file.read()
     if len(data) > 6 * 1024 * 1024: raise HTTPException(400, "Image trop volumineuse (max 6 Mo).")
+    ct = file.content_type or "image/jpeg"
+    if ct.startswith("image/"):
+        flags = await moderate_image(data, ct)
+        if flags["plate"] and flags["phone"]:
+            raise HTTPException(400, "Photo refusée : une plaque d'immatriculation et un numéro de téléphone ont été détectés. Merci de les masquer avant de réessayer.")
+        if flags["plate"]:
+            raise HTTPException(400, "Photo refusée : une plaque d'immatriculation a été détectée. Merci de la masquer avant de réessayer.")
+        if flags["phone"]:
+            raise HTTPException(400, "Photo refusée : un numéro de téléphone a été détecté. Merci de le masquer avant de réessayer.")
     path = f"swipeupcar/uploads/{str(u['_id'])}/{uuid.uuid4().hex}.{ext}"
-    res = put_object(path, data, file.content_type or "image/jpeg")
+    res = put_object(path, data, ct)
     return {"url": f"/api/files/{res['path']}"}
 
 @api.get("/files/{path:path}")
