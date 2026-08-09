@@ -100,3 +100,9 @@ index, location (recherche+filtres+tri), vehicule (fiche+réservation), reservat
 - Fail-open : si l'IA échoue/clé absente, l'upload passe (pas de blocage abusif).
 - Frontend : loueur.html (ajout véhicule) et pro.html (galerie prestataire) affichent le message d'erreur via toast et stoppent l'ajout.
 - Vérifié e2e : image plaque+numéro → 400 refusé ; image propre → 200 + URL.
+
+## Modération IA des avis (texte) — 2026-06-09
+- `moderate_text()` (Gemini `gemini-3-flash-preview`, EMERGENT_LLM_KEY) analyse : coordonnées (téléphone/email/URL/réseaux) et propos interdits (insultes/haine).
+- Appliqué sur `POST /api/reviews` (avis client) et `POST /api/reviews/{id}/reply` (réponse loueur) → HTTP 400 + message clair si détecté. Fail-open si IA échoue.
+- Frontend : compte.html (leaveReview) et loueur.html (replyReview) affichent déjà l'erreur via toast.
+- Vérifié : contact → bloqué, insultes → bloqué, avis propre → accepté.

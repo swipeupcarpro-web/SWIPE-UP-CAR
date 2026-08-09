@@ -667,6 +667,47 @@ async def recompute_vehicle_rating(vid):
             sat = round(100 * sum(1 for r in allr if r["rating"] >= 4) / m)
             await db.users.update_one({"_id": oid(v["owner"])}, {"$set": {"rating": oavg, "satisfaction": sat}})
 
+async def moderate_text(text: str):
+    """Détecte coordonnées (téléphone/email/URL/réseaux) ou propos interdits (insultes, haine).
+    Retourne {"contact": bool, "abusive": bool}. Fail-open en cas d'erreur IA."""
+    text = (text or "").strip()
+    if not text or not EMERGENT_LLM_KEY:
+        return {"contact": False, "abusive": False}
+    try:
+        from emergentintegrations.llm.chat import LlmChat, UserMessage
+        chat = LlmChat(
+            api_key=EMERGENT_LLM_KEY,
+            session_id=f"modtxt-{uuid.uuid4().hex}",
+            system_message=(
+                "Tu es un modérateur de texte pour une marketplace automobile française. "
+                "Analyse le message et détecte deux choses : "
+                "1) contact : présence de coordonnées personnelles (numéro de téléphone, email, "
+                "adresse, lien/URL, identifiant de réseau social/WhatsApp/Instagram) permettant de "
+                "contourner la plateforme ; "
+                "2) abusive : propos interdits (insultes, haine, harcèlement, contenu discriminatoire). "
+                "Réponds STRICTEMENT en JSON compact sans texte autour : "
+                '{"contact": true/false, "abusive": true/false}.'
+            ),
+        ).with_model("gemini", "gemini-3-flash-preview")
+        resp = await chat.send_message(UserMessage(text=text))
+        raw = resp if isinstance(resp, str) else str(resp)
+        m = re.search(r"\{.*\}", raw, re.DOTALL)
+        if m:
+            j = _json.loads(m.group(0))
+            return {"contact": bool(j.get("contact")), "abusive": bool(j.get("abusive"))}
+    except Exception as e:
+        logger.warning(f"moderate_text failed: {e}")
+    return {"contact": False, "abusive": False}
+
+def _review_moderation_error(flags):
+    if flags["contact"] and flags["abusive"]:
+        return "Message refusé : coordonnées personnelles et propos inappropriés détectés. Merci de les retirer."
+    if flags["contact"]:
+        return "Message refusé : les coordonnées personnelles (téléphone, email, lien, réseau social) ne sont pas autorisées dans les avis."
+    if flags["abusive"]:
+        return "Message refusé : propos inappropriés détectés. Merci de rester courtois."
+    return None
+
 @api.post("/reviews")
 async def create_review(data: ReviewIn, u=Depends(current_user)):
     b = await db.bookings.find_one({"_id": oid(data.bookingId)})
@@ -675,6 +716,8 @@ async def create_review(data: ReviewIn, u=Depends(current_user)):
         raise HTTPException(400, "Vous pourrez laisser un avis après la fin de la location.")
     if await db.reviews.find_one({"bookingId": data.bookingId}):
         raise HTTPException(400, "Vous avez déjà laissé un avis pour cette location.")
+    err = _review_moderation_error(await moderate_text(data.text))
+    if err: raise HTTPException(400, err)
     rating = max(1, min(5, data.rating))
     doc = {"bookingId": data.bookingId, "vehicleId": b["vehicleId"], "userId": str(u["_id"]),
            "ownerId": b.get("ownerId"), "clientName": u.get("firstName", ""), "rating": rating,
@@ -719,6 +762,8 @@ async def reply_review(rid: str, data: ReplyIn, u=Depends(current_user)):
         raise HTTPException(403, "Vous ne pouvez répondre qu'aux avis reçus sur vos véhicules.")
     reply = (data.text or "").strip()[:600]
     if not reply: raise HTTPException(400, "La réponse ne peut pas être vide.")
+    err = _review_moderation_error(await moderate_text(reply))
+    if err: raise HTTPException(400, err)
     await db.reviews.update_one({"_id": r["_id"]}, {"$set": {"ownerReply": reply, "ownerReplyDate": datetime.now(timezone.utc).isoformat()}})
     return {"ok": True, "ownerReply": reply}
 
