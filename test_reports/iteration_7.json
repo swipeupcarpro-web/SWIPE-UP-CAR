@@ -1,0 +1,23 @@
+{
+  "summary": "Retest of residual mobile overflow bug on /swipeupcar/vehicule.html at 390px after adding class .stack-sm on Caractéristiques grid + Conditions card. Result: PASS. No horizontal overflow on any tested page at 390px; desktop 1280px non-regression confirmed (2-column grids preserved on vehicule.html).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": ["/app/test_reports/vehicule_mobile.png"],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Inline styles on vehicule.html grids (grid-template-columns:1fr 1fr) rely on !important override via .stack-sm at <=600px; works but consider moving grid definition entirely to CSS class for cleaner cascade.",
+    "spec() helper hardcodes label width:110px; combined with padding, this exactly caused the earlier overflow. Consider making it flex with min-width:0 for future-proofing."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A", "frontend": "100%"},
+  "test_credentials": "Client client@swipeupcar.fr/client123, Loueur sophie@swipeupcar.fr/loueur123, Pro garage@swipeupcar.fr/pro123, Admin swipeupcar.pro@gmail.com/SwipeAdmin@2026",
+  "seed_data_creation": "None. Used existing vehicle id 6a777368227a020c5a3df773 from location.html listing.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Iteration_6 had residual ~92px overflow on vehicule.html at 390px. Fix (adding .stack-sm on Caractéristiques grid) is confirmed. All 10 mobile pages (index, location, services entretien/pieces, reservation, vehicule, compte, pro, loueur, admin) show scrollWidth==innerWidth==390 (overflow=0). Desktop 1280px: vehicule.html Caractéristiques grid=327px 327px, Conditions grid=312px 312px (2 cols preserved).",
+  "rca of the issue": "RCA (fixed): The 'Caractéristiques' grid on vehicule.html used inline style grid-template-columns:1fr 1fr with no responsive class. Combined with the spec() helper's fixed 110px label + numeric value, content forced a min row width > 195px per column at 390px viewport, causing ~92px horizontal overflow. Mitigation: added class 'stack-sm' on both the Caractéristiques grid (line 28) and Conditions card (line 34); style.css @media(max-width:600px) applies grid-template-columns:minmax(0,1fr)!important, collapsing to a single column. Verified via document.documentElement.scrollWidth<=innerWidth+2 across all pages."
+}

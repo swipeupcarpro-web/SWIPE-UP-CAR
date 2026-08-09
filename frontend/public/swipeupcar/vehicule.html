@@ -25,7 +25,7 @@ document.getElementById('page').innerHTML=`
    <div style="color:var(--muted);margin-top:4px">${v.year} • ${v.city} (${v.dept}) • <i class="fa-solid fa-star" style="color:var(--amber)"></i> ${v.rating.toFixed(1)} (${v.reviews} avis)</div></div>
   <p style="margin-top:14px;color:#40382f;line-height:1.6">${v.desc}</p>
   <h3 style="margin-top:20px">Caractéristiques</h3>
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 24px">
+  <div class="stack-sm" style="display:grid;grid-template-columns:1fr 1fr;gap:0 24px">
    ${spec('fa-calendar','Année',v.year)}${spec('fa-road','Kilométrage',v.km.toLocaleString('fr-FR')+' km')}${spec('fa-bolt','Puissance',v.power+' ch')}${spec('fa-gas-pump','Carburant',v.fuel)}${spec('fa-gear','Boîte',v.gear)}${spec('fa-user-group','Places',v.seats)}${spec('fa-door-open','Portes',v.doors)}${spec('fa-palette','Couleur',v.color)}
   </div>
   <h3 style="margin-top:20px">Équipements</h3>
