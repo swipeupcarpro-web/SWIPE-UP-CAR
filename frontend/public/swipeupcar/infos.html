@@ -13,7 +13,12 @@
 
 <section id="security" style="margin-top:40px"><h1 style="font-size:32px">Sécurité</h1>
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin-top:16px">
- ${['Professionnels vérifiés par notre équipe','Paiement sécurisé, aucune donnée bancaire stockée','Coordonnées masquées avant réservation','Messagerie modérée anti-contournement','Avis liés à des réservations réelles','Système de réputation et signalement'].map(x=>`<div class="card" style="padding:16px"><i class="fa-solid fa-shield-halved" style="color:var(--green)"></i> ${x}</div>`).join('')}
+ <div class="card" style="padding:16px"><i class="fa-solid fa-shield-halved" style="color:var(--green)"></i> Professionnels vérifiés par notre équipe</div>
+ <div class="card" style="padding:16px"><i class="fa-solid fa-shield-halved" style="color:var(--green)"></i> Paiement sécurisé, aucune donnée bancaire stockée</div>
+ <div class="card" style="padding:16px"><i class="fa-solid fa-shield-halved" style="color:var(--green)"></i> Coordonnées masquées avant réservation</div>
+ <div class="card" style="padding:16px"><i class="fa-solid fa-shield-halved" style="color:var(--green)"></i> Messagerie modérée anti-contournement</div>
+ <div class="card" style="padding:16px"><i class="fa-solid fa-shield-halved" style="color:var(--green)"></i> Avis liés à des réservations réelles</div>
+ <div class="card" style="padding:16px"><i class="fa-solid fa-shield-halved" style="color:var(--green)"></i> Système de réputation et signalement</div>
 </div></section>
 
 <section id="faq" style="margin-top:40px"><h1 style="font-size:32px">FAQ</h1><div id="faqBox" style="margin-top:14px"></div></section>
@@ -21,9 +26,13 @@
 <section id="contact" style="margin-top:40px"><h1 style="font-size:32px">Contact</h1>
 <div class="card" style="padding:22px;margin-top:14px"><form id="contactForm"><div style="display:flex;gap:12px" class="how-grid"><div style="flex:1"><label class="label">Nom</label><input class="input" required></div><div style="flex:1"><label class="label">Email</label><input class="input" type="email" required></div></div><label class="label" style="margin-top:12px">Message</label><textarea class="input" rows="4" required></textarea><button class="btn btn-red" style="margin-top:14px">Envoyer</button></form></div></section>
 
-<section id="cgu" style="margin-top:40px"><h1 style="font-size:32px">Conditions générales</h1><p style="color:var(--muted)">SWIPEUPCAR est une plateforme de mise en relation et de réservation. SWIPEUPCAR n'est pas propriétaire des véhicules. Le loueur est responsable de l'exécution de la location selon ses conditions ; le client est responsable du respect des conditions acceptées. Une commission de 5% est prélevée sur chaque réservation. <b>Ces textes juridiques sont des modèles à faire valider par un professionnel du droit avant lancement.</b></p></section>
-<section id="privacy" style="margin-top:30px"><h1 style="font-size:32px">Confidentialité</h1><p style="color:var(--muted)">Vos données sont traitées conformément au RGPD. Les coordonnées personnelles ne sont jamais affichées publiquement. (Modèle à valider.)</p></section>
-<section id="legal" style="margin-top:30px"><h1 style="font-size:32px">Mentions légales</h1><p style="color:var(--muted)">SWIPEUPCAR — plateforme automobile. Éditeur, hébergeur et SIREN à compléter avant mise en production.</p></section>
+<section id="cgu" style="margin-top:40px"><h1 style="font-size:32px">Documents juridiques</h1><p style="color:var(--muted)">Retrouvez l'ensemble des conditions et politiques de SWIPEUPCAR :</p>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin-top:14px">
+ <a href="cgu.html" class="card" style="padding:18px;text-decoration:none;color:inherit"><i class="fa-solid fa-file-contract" style="color:var(--red)"></i> <b>CGU</b><div style="color:var(--muted);font-size:13px;margin-top:4px">Conditions générales d'utilisation</div></a>
+ <a href="cgv.html" class="card" style="padding:18px;text-decoration:none;color:inherit"><i class="fa-solid fa-file-invoice-dollar" style="color:var(--red)"></i> <b>CGV</b><div style="color:var(--muted);font-size:13px;margin-top:4px">Conditions générales de vente</div></a>
+ <a href="confidentialite.html" class="card" style="padding:18px;text-decoration:none;color:inherit"><i class="fa-solid fa-user-shield" style="color:var(--red)"></i> <b>Confidentialité</b><div style="color:var(--muted);font-size:13px;margin-top:4px">Politique RGPD & cookies</div></a>
+ <a href="mentions-legales.html" class="card" style="padding:18px;text-decoration:none;color:inherit"><i class="fa-solid fa-scale-balanced" style="color:var(--red)"></i> <b>Mentions légales</b><div style="color:var(--muted);font-size:13px;margin-top:4px">Éditeur & hébergeur</div></a>
+</div></section>
 </div>
 <div id="footer"></div><div id="mnav"></div>
 <script src="assets/app.js"></script>

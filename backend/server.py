@@ -3,7 +3,7 @@ from pathlib import Path
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
-import os, logging, jwt, bcrypt, httpx, asyncio
+import os, re, logging, jwt, bcrypt, httpx, asyncio
 from datetime import datetime, timezone, timedelta
 from fastapi import FastAPI, APIRouter, HTTPException, Request, Depends, UploadFile, File, Response
 from starlette.middleware.cors import CORSMiddleware
@@ -241,6 +241,7 @@ def days_between(a, b):
 
 @api.post("/bookings")
 async def create_booking(data: BookingIn, u=Depends(current_user)):
+    if not u.get("verified"): raise HTTPException(403, "Veuillez confirmer votre adresse email avant de réserver. Renvoyez l'email de confirmation depuis votre espace.")
     v = await db.vehicles.find_one({"_id": oid(data.vehicleId)})
     if not v or v["status"] != "approved": raise HTTPException(400, "Véhicule indisponible.")
     clash = await db.bookings.find_one({"vehicleId": data.vehicleId, "status": "confirmed",
@@ -416,6 +417,7 @@ async def connect_status(u=Depends(current_user)):
 
 @api.post("/payments/checkout/booking")
 async def checkout_booking(data: BookingCheckoutIn, u=Depends(current_user)):
+    if not u.get("verified"): raise HTTPException(403, "Veuillez confirmer votre adresse email avant de réserver. Renvoyez l'email de confirmation depuis votre espace.")
     v = await db.vehicles.find_one({"_id": oid(data.vehicleId)})
     if not v or v["status"] != "approved": raise HTTPException(400, "Véhicule indisponible.")
     clash = await db.bookings.find_one({"vehicleId": data.vehicleId, "status": "confirmed",
@@ -521,6 +523,71 @@ async def toggle_favorite(vid: str, u=Depends(current_user)):
     await db.users.update_one({"_id": u["_id"]}, {"$set": {"favorites": favs}})
     return {"favorited": added}
 
+# ---------- messaging (server-persisted) ----------
+MSG_CONTACT_RE = re.compile(r"(\b0[1-9]([ .-]?\d{2}){4}\b)|(\+33)|([a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,})|(wa\.me|whatsapp|instagram|snap(chat)?|telegram|t\.me|facebook|https?://|www\.)", re.I)
+def filter_contact(text):
+    warn = bool(MSG_CONTACT_RE.search(text or ""))
+    clean = MSG_CONTACT_RE.sub("•••••", text or "") if warn else (text or "")
+    return clean, warn
+
+class ConvIn(BaseModel):
+    to: str
+    vehicleId: Optional[str] = None
+class MsgIn(BaseModel):
+    text: str
+
+async def conv_out(c, me_id, with_messages=True):
+    other_id = next((m for m in c.get("members", []) if m != me_id), None)
+    other = await db.users.find_one({"_id": oid(other_id)}) if other_id else None
+    msgs = c.get("messages", [])
+    out = {"id": str(c["_id"]), "members": c.get("members", []), "otherId": other_id,
+           "otherName": ((other.get("company") or other.get("firstName")) if other else "Utilisateur"),
+           "otherVerified": (other.get("verified", False) if other else False),
+           "vehicleId": c.get("vehicleId"), "updatedAt": c.get("updatedAt"),
+           "last": (msgs[-1]["text"] if msgs else "")}
+    if with_messages: out["messages"] = msgs
+    return out
+
+@api.get("/conversations")
+async def list_conversations(u=Depends(current_user)):
+    me_id = str(u["_id"])
+    rows = await db.conversations.find({"members": me_id}).sort("updatedAt", -1).to_list(200)
+    return [await conv_out(c, me_id, with_messages=False) for c in rows]
+
+@api.post("/conversations")
+async def create_conversation(data: ConvIn, u=Depends(current_user)):
+    me_id = str(u["_id"])
+    if data.to == me_id: raise HTTPException(400, "Conversation invalide.")
+    other = await db.users.find_one({"_id": oid(data.to)})
+    if not other: raise HTTPException(404, "Destinataire introuvable.")
+    key = "_".join(sorted([me_id, data.to]))
+    c = await db.conversations.find_one({"key": key})
+    if not c:
+        doc = {"key": key, "members": [me_id, data.to], "vehicleId": data.vehicleId,
+               "messages": [], "updatedAt": datetime.now(timezone.utc).isoformat()}
+        r = await db.conversations.insert_one(doc); doc["_id"] = r.inserted_id; c = doc
+    return await conv_out(c, me_id)
+
+@api.get("/conversations/{cid}")
+async def get_conversation(cid: str, u=Depends(current_user)):
+    me_id = str(u["_id"])
+    c = await db.conversations.find_one({"_id": oid(cid)})
+    if not c or me_id not in c.get("members", []): raise HTTPException(404, "Conversation introuvable.")
+    return await conv_out(c, me_id)
+
+@api.post("/conversations/{cid}/messages")
+async def send_message(cid: str, data: MsgIn, u=Depends(current_user)):
+    me_id = str(u["_id"])
+    c = await db.conversations.find_one({"_id": oid(cid)})
+    if not c or me_id not in c.get("members", []): raise HTTPException(404, "Conversation introuvable.")
+    text = (data.text or "").strip()
+    if not text: raise HTTPException(400, "Message vide.")
+    clean, warn = filter_contact(text)
+    msg = {"from": me_id, "text": clean, "warn": warn, "date": datetime.now(timezone.utc).isoformat()}
+    await db.conversations.update_one({"_id": c["_id"]},
+        {"$push": {"messages": msg}, "$set": {"updatedAt": msg["date"]}})
+    return {"message": msg, "warn": warn}
+
 # ---------- admin ----------
 async def require_admin(u=Depends(current_user)):
     if u["role"] != "ADMIN": raise HTTPException(403, "Réservé à l'administration")
@@ -606,17 +673,28 @@ IMG = {
 async def startup():
     await db.users.create_index("email", unique=True)
     admin_email = os.environ["ADMIN_EMAIL"].lower()
-    if not await db.users.find_one({"email": admin_email}):
-        await db.users.insert_one({"firstName": "Admin", "lastName": "SUC", "email": admin_email,
-            "password_hash": hash_pw(os.environ["ADMIN_PASSWORD"]), "role": "ADMIN", "verified": True})
+    admin_pw = os.environ["ADMIN_PASSWORD"]
+    admin_doc = await db.users.find_one({"email": admin_email})
+    if not admin_doc:
+        r = await db.users.insert_one({"firstName": "Admin", "lastName": "SWIPEUPCAR", "email": admin_email,
+            "password_hash": hash_pw(admin_pw), "role": "ADMIN", "verified": True})
+        admin_id = str(r.inserted_id)
+    else:
+        admin_id = str(admin_doc["_id"])
+        if admin_doc.get("role") != "ADMIN":
+            # Compte officiel du site promu ADMIN (était loueur auparavant)
+            await db.users.update_one({"_id": admin_doc["_id"]},
+                {"$set": {"role": "ADMIN", "verified": True, "password_hash": hash_pw(admin_pw)}})
     # demo loueurs + client
     async def ensure_user(email, pw, doc):
         ex = await db.users.find_one({"email": email})
         if ex: return str(ex["_id"])
         doc["email"] = email; doc["password_hash"] = hash_pw(pw)
         r = await db.users.insert_one(doc); return str(r.inserted_id)
-    l1 = await ensure_user("swipeupcar.pro@gmail.com", "loueur123", {"firstName":"Thomas","lastName":"Martin","role":"LOUEUR","verified":True,"proStatus":"Validé","siret":"81234567800012","company":"Martin Auto Location","rating":4.9,"rentals":118,"since":"2023","satisfaction":98})
     l2 = await ensure_user("sophie@swipeupcar.fr", "loueur123", {"firstName":"Sophie","lastName":"Durand","role":"LOUEUR","verified":True,"proStatus":"Validé","siret":"75234567800045","company":"Durand Mobilité","rating":4.7,"rentals":64,"since":"2024","satisfaction":95})
+    l1 = l2  # les véhicules de démo appartiennent désormais au loueur de démo
+    # Tout véhicule encore rattaché au compte admin officiel est réattribué au loueur de démo
+    await db.vehicles.update_many({"owner": admin_id}, {"$set": {"owner": l2}})
     await ensure_user("client@swipeupcar.fr", "client123", {"firstName":"Julie","lastName":"Bernard","role":"PARTICULIER","verified":True,"phone":"0600000000"})
     if await db.vehicles.count_documents({}) == 0:
         seed = [

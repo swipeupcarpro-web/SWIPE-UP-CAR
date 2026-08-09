@@ -9,31 +9,40 @@
 <script>
 const u=requireAuth();
 if(u){
- const P=new URLSearchParams(location.search);const to=P.get('to');
- function convId(a,b){return[a,b].sort().join('_')}
- function getConv(id){const db=DB.get();return db.conversations.find(c=>c.id===id)}
- function ensureConv(other){const db=DB.get();const id=convId(u.id,other);let c=db.conversations.find(x=>x.id===id);if(!c){c={id,members:[u.id,other],messages:[]};db.conversations.push(c);DB.set(db)}return id}
- if(to)ensureConv(to);
- function myConvs(){return DB.get().conversations.filter(c=>c.members.includes(u.id))}
- let active=to?convId(u.id,to):(myConvs()[0]&&myConvs()[0].id);
+ const P=new URLSearchParams(location.search);const to=P.get('to');const vparam=P.get('v');
+ let active=null; let convs=[];
+ function escapeHtml(s){return (s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+ function loadConvs(){const r=apiSync('/conversations');convs=Array.isArray(r)?r:[];}
+ window.setActive=id=>{active=id;render();};
  function render(){
-  const db=DB.get();const convs=myConvs();
-  const list=convs.map(c=>{const other=db.users.find(x=>x.id===c.members.find(m=>m!==u.id));const last=c.messages[c.messages.length-1];return `<div onclick="setActive('${c.id}')" class="card" style="padding:12px;margin-bottom:8px;cursor:pointer;${c.id===active?'border-color:var(--red)':''}"><b>${other?(other.company||other.firstName):'Utilisateur'}</b><div style="color:var(--muted);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${last?last.text:'Nouvelle conversation'}</div></div>`}).join('')||'<p style="color:var(--muted)">Aucune conversation.</p>';
-  const c=convs.find(x=>x.id===active);
+  const prev=document.getElementById('msgInput');const draft=prev?prev.value:'';const hadFocus=prev&&document.activeElement===prev;
+  const listHtml=convs.map(c=>`<div onclick="setActive('${c.id}')" class="card" data-testid="conv-item-${c.id}" style="padding:12px;margin-bottom:8px;cursor:pointer;${c.id===active?'border-color:var(--red)':''}"><b>${escapeHtml(c.otherName)} ${c.otherVerified?'<span class="chip badge-verified" style="font-size:11px">Vérifié</span>':''}</b><div style="color:var(--muted);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(c.last)||'Nouvelle conversation'}</div></div>`).join('')||'<p style="color:var(--muted)" data-testid="conv-empty">Aucune conversation.</p>';
   let thread='<div style="display:grid;place-items:center;height:300px;color:var(--muted)">Sélectionnez une conversation</div>';
-  if(c){const other=db.users.find(x=>x.id===c.members.find(m=>m!==u.id));
-   thread=`<div style="padding:14px;border-bottom:1px solid var(--line);font-weight:700">${other?(other.company||other.firstName):'Utilisateur'} ${other&&other.verified?'<span class="chip badge-verified" style="font-size:11px">Vérifié</span>':''}</div>
-   <div id="msgs" style="padding:14px;height:340px;overflow-y:auto;display:flex;flex-direction:column;gap:8px">${c.messages.map(m=>`<div style="align-self:${m.from===u.id?'flex-end':'flex-start'};max-width:75%;padding:10px 14px;border-radius:14px;background:${m.from===u.id?'var(--red)':'#fff'};color:${m.from===u.id?'#fff':'inherit'};border:1px solid var(--line)">${m.text}${m.warn?'<div style="font-size:11px;opacity:.8;margin-top:4px">⚠ coordonnées masquées</div>':''}</div>`).join('')||'<div style="color:var(--muted);text-align:center;margin:auto">Démarrez la conversation</div>'}</div>
-   <form id="sendForm" style="display:flex;gap:8px;padding:12px;border-top:1px solid var(--line)"><input class="input" id="msgInput" placeholder="Votre message..." data-testid="msg-input"><button class="btn btn-red" data-testid="msg-send">Envoyer</button></form>
-   <div style="padding:0 14px 12px;color:var(--muted);font-size:12px"><i class="fa-solid fa-lock"></i> Pour votre sécurité, les coordonnées externes ne peuvent pas être partagées avant la réservation.</div>`;}
-  document.getElementById('page').innerHTML=`<h1 style="font-size:24px">Messagerie</h1><div style="display:grid;grid-template-columns:280px 1fr;gap:20px;margin-top:14px" class="msg-grid"><div>${list}</div><div class="card" style="min-height:420px;display:flex;flex-direction:column">${thread}</div></div>`;
-  const sf=document.getElementById('sendForm');if(sf)sf.onsubmit=e=>{e.preventDefault();send(document.getElementById('msgInput').value)};
+  if(active){
+   const c=apiSync('/conversations/'+active);
+   if(c&&!c.error){
+    thread=`<div style="padding:14px;border-bottom:1px solid var(--line);font-weight:700" data-testid="conv-header">${escapeHtml(c.otherName)} ${c.otherVerified?'<span class="chip badge-verified" style="font-size:11px">Vérifié</span>':''}</div>
+    <div id="msgs" data-testid="msg-list" style="padding:14px;height:340px;overflow-y:auto;display:flex;flex-direction:column;gap:8px">${(c.messages||[]).map(m=>`<div style="align-self:${m.from===u.id?'flex-end':'flex-start'};max-width:75%;padding:10px 14px;border-radius:14px;background:${m.from===u.id?'var(--red)':'#fff'};color:${m.from===u.id?'#fff':'inherit'};border:1px solid var(--line)">${escapeHtml(m.text)}${m.warn?'<div style="font-size:11px;opacity:.8;margin-top:4px">⚠ coordonnées masquées</div>':''}</div>`).join('')||'<div style="color:var(--muted);text-align:center;margin:auto">Démarrez la conversation</div>'}</div>
+    <form id="sendForm" style="display:flex;gap:8px;padding:12px;border-top:1px solid var(--line)"><input class="input" id="msgInput" placeholder="Votre message..." data-testid="msg-input" autocomplete="off"><button class="btn btn-red" data-testid="msg-send">Envoyer</button></form>
+    <div style="padding:0 14px 12px;color:var(--muted);font-size:12px"><i class="fa-solid fa-lock"></i> Pour votre sécurité, les coordonnées externes ne peuvent pas être partagées avant la réservation.</div>`;
+   }
+  }
+  document.getElementById('page').innerHTML=`<h1 style="font-size:24px">Messagerie</h1><div style="display:grid;grid-template-columns:280px 1fr;gap:20px;margin-top:14px" class="msg-grid"><div data-testid="conv-list">${listHtml}</div><div class="card" style="min-height:420px;display:flex;flex-direction:column">${thread}</div></div>`;
+  const sf=document.getElementById('sendForm');if(sf)sf.onsubmit=e=>{e.preventDefault();send(document.getElementById('msgInput').value);};
+  const ni=document.getElementById('msgInput');if(ni){ni.value=draft;if(hadFocus){ni.focus();ni.selectionStart=ni.selectionEnd=draft.length;}}
   const box=document.getElementById('msgs');if(box)box.scrollTop=box.scrollHeight;
  }
- window.setActive=id=>{active=id;render()};
- function send(text){text=text.trim();if(!text)return;const warn=containsContact(text);if(warn){text=text.replace(CONTACT_RE,'•••••');toast('Coordonnées masquées pour votre sécurité');}
-  const db=DB.get();const c=db.conversations.find(x=>x.id===active);c.messages.push({from:u.id,text,warn,date:new Date().toISOString()});DB.set(db);render();}
+ function send(text){text=(text||'').trim();if(!text)return;
+  if(containsContact(text))toast('Coordonnées masquées pour votre sécurité');
+  const r=apiSync('/conversations/'+active+'/messages','POST',{text});
+  if(r&&r.error){toast(r.error);return;}
+  loadConvs();render();
+ }
+ loadConvs();
+ if(to){const r=apiSync('/conversations','POST',{to,vehicleId:vparam||null});if(r&&r.id){active=r.id;loadConvs();}}
+ else if(convs.length){active=convs[0].id;}
  render();
+ setInterval(()=>{if(active){loadConvs();render();}},6000);
 }
 </script>
 <style>@media(max-width:860px){.msg-grid{grid-template-columns:1fr!important}}</style>
